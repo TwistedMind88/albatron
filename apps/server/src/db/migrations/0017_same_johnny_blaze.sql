@@ -1,0 +1,1 @@
+ALTER TABLE "document_items" ADD COLUMN "carinska_stopa" numeric(6, 2);

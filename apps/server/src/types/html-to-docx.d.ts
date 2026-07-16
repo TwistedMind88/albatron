@@ -1,0 +1,8 @@
+declare module "html-to-docx" {
+  // ponytail: minimalna deklaracija, paket nema tipove
+  export default function HTMLtoDOCX(
+    html: string,
+    headerHTML?: string | null,
+    options?: Record<string, unknown>,
+  ): Promise<Buffer>;
+}

@@ -1,0 +1,19 @@
+node_modules/
+dist/
+build/
+.env
+*.log
+.DS_Store
+apps/desktop/src-tauri/target/
+apps/web/dist/
+apps/server/dist/
+.claude/
+.playwright-cli/
+apps/server/storage/
+storage/
+
+# privatni radni materijal - ne ide na javni repo
+koncept/
+plan/
+docs/
+CLAUDE.md

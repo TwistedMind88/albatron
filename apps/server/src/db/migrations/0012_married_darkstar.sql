@@ -1,0 +1,1 @@
+ALTER TABLE "articles" ADD COLUMN "dodatni_troskovi_stopa" numeric(8, 2);

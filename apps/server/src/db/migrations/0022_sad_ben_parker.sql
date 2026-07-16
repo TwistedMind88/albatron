@@ -1,0 +1,1 @@
+ALTER TABLE "document_items" ADD COLUMN "koleta" numeric(14, 2);
