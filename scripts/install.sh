@@ -242,7 +242,7 @@ run_as_app "cd '$INSTALL_DIR' && pnpm install --frozen-lockfile"
 
 # desktop paket (tauri) se ne gradi na serveru - treba mu Rust i sluzi samo za Windows klijent
 info "gradim aplikaciju (server + web)"
-run_as_app "cd '$INSTALL_DIR' && pnpm --filter @albatron/server --filter @albatron/web build"
+run_as_app "cd '$INSTALL_DIR' && pnpm --filter @albatron/shared --filter @albatron/server --filter @albatron/web build"
 
 # ---------- migracije + seed ----------
 DB_URL="$(grep '^DATABASE_URL=' "$ENV_FILE" | cut -d= -f2-)"
@@ -266,7 +266,7 @@ After=network.target postgresql.service
 [Service]
 User=$APP_USER
 WorkingDirectory=$INSTALL_DIR/apps/server
-ExecStart=/usr/bin/node --env-file=$INSTALL_DIR/.env dist/index.js
+ExecStart=/usr/bin/node --conditions=production --env-file=$INSTALL_DIR/.env dist/index.js
 Restart=always
 $NODE_ENV_LINE
 
@@ -277,6 +277,10 @@ EOF
   systemctl enable --now "$SERVICE_NAME"
 else
   info "restartujem servis"
+  if ! grep -q -- "--conditions=production" "/etc/systemd/system/$SERVICE_NAME.service"; then
+    sed -i 's|/usr/bin/node --env-file=|/usr/bin/node --conditions=production --env-file=|' "/etc/systemd/system/$SERVICE_NAME.service"
+    systemctl daemon-reload
+  fi
   systemctl restart "$SERVICE_NAME"
 fi
 

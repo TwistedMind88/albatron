@@ -237,7 +237,7 @@ if ($LASTEXITCODE -ne 0) { Die "pnpm install nije uspeo" }
 
 # desktop paket (tauri) se ne gradi na serveru - sluzi samo za klijentske masine
 Info "gradim aplikaciju (server + web)"
-pnpm --filter "@albatron/server" --filter "@albatron/web" build
+pnpm --filter "@albatron/shared" --filter "@albatron/server" --filter "@albatron/web" build
 if ($LASTEXITCODE -ne 0) { Die "build nije uspeo" }
 
 # ---------- migracije + seed ----------
@@ -260,7 +260,7 @@ if ($Mode -eq "install") {
   Info "kreiram Windows servis $ServiceName"
   $LogDir = Join-Path $InstallDir "logs"
   New-Item -ItemType Directory -Force $LogDir | Out-Null
-  nssm install $ServiceName $NodeExe "--env-file=$EnvFile" "dist\index.js"
+  nssm install $ServiceName $NodeExe "--conditions=production" "--env-file=$EnvFile" "dist\index.js"
   nssm set $ServiceName AppDirectory (Join-Path $InstallDir "apps\server")
   nssm set $ServiceName AppStdout (Join-Path $LogDir "albatron.log")
   nssm set $ServiceName AppStderr (Join-Path $LogDir "albatron-error.log")
@@ -268,6 +268,7 @@ if ($Mode -eq "install") {
   nssm start $ServiceName
 } else {
   Info "restartujem servis"
+  nssm set $ServiceName AppParameters "--conditions=production" "--env-file=$EnvFile" "dist\index.js"
   nssm restart $ServiceName
 }
 
