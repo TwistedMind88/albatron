@@ -11,6 +11,7 @@ apps/server/dist/
 .playwright-cli/
 apps/server/storage/
 storage/
+downloads/
 
 # privatni radni materijal - ne ide na javni repo
 koncept/

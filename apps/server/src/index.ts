@@ -21,6 +21,7 @@ import { zaliheRoutes } from "./modules/zalihe/routes.js";
 import { obracuniRoutes } from "./modules/obracuni/routes.js";
 import { uplateRoutes } from "./modules/uplate/routes.js";
 import { projektiRoutes } from "./modules/projekti/routes.js";
+import { downloadRoutes } from "./modules/download/routes.js";
 import { cleanExpiredSessions, cleanOldAuditLog } from "./modules/auth/service.js";
 
 // trustProxy: ispravan req.ip/protocol iza proxyja (Cloudflare i sl., stavke 21-23)
@@ -58,6 +59,7 @@ await app.register(zaliheRoutes);
 await app.register(obracuniRoutes);
 await app.register(uplateRoutes);
 await app.register(projektiRoutes);
+await app.register(downloadRoutes);
 
 app.get("/api/health", async () => ({ ok: true }));
 
@@ -72,13 +74,12 @@ if (existsSync(webDist)) {
   });
 }
 
-await cleanExpiredSessions();
-
-// RP7: ciscenje audit loga starijeg od 60 dana - pri startu i na svaka 24h
+// RP7: ciscenje audit loga (60 dana) i isteklih sesija - pri startu i na svaka 24h
 async function ocistiAuditLog() {
   try {
     const n = await cleanOldAuditLog();
     if (n > 0) app.log.info(`Audit log: obrisano ${n} redova starijih od 60 dana`);
+    await cleanExpiredSessions();
   } catch (err) {
     app.log.error(err, "ciscenje audit loga neuspesno");
   }

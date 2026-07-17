@@ -27,7 +27,9 @@ export function sacuvajSesije(sesije: ServerSesija[]) {
 export function aktivirajSesiju(url: string) {
   if (url) localStorage.setItem("apiBase", url);
   else localStorage.removeItem("apiBase");
+  // token iz oba storage-a: localStorage (browser remote) i sessionStorage (Tauri)
   localStorage.removeItem("apiToken");
+  sessionStorage.removeItem("apiToken");
   location.reload();
 }
 

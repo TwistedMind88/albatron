@@ -3,14 +3,21 @@ import { and, eq, inArray, lt } from "drizzle-orm";
 import { ADMIN_ROLE, type SessionUser } from "@albatron/shared";
 import { db, schema } from "../../db/index.js";
 
-const SESSION_TTL_MS = 1000 * 60 * 60 * 12; // 12h
+// Sesija vazi do kraja tekuceg dana (prijava jednom dnevno), ali najmanje 8h od
+// prijave da vecernja prijava ne istekne usred rada
+function sessionExpiresAt(): Date {
+  const krajDana = new Date();
+  krajDana.setHours(23, 59, 59, 999);
+  const min8h = new Date(Date.now() + 8 * 60 * 60 * 1000);
+  return krajDana > min8h ? krajDana : min8h;
+}
 
 export async function createSession(userId: number): Promise<string> {
   const token = randomBytes(32).toString("hex");
   await db.insert(schema.sessions).values({
     token,
     userId,
-    expiresAt: new Date(Date.now() + SESSION_TTL_MS),
+    expiresAt: sessionExpiresAt(),
   });
   return token;
 }

@@ -173,6 +173,32 @@ else
 fi
 chown -R "$APP_USER:$APP_USER" "$INSTALL_DIR"
 
+# ---------- desktop instalater sa GitHub Release-a ----------
+# Server servira desktop instalater na /download i update manifest na /updates
+# (radne stanice ne moraju imati internet). Preuzima se asset objavljenog taga.
+if [ -n "${TAG:-}" ]; then
+  info "preuzimam desktop instalater za $TAG"
+  DL_DIR="$INSTALL_DIR/downloads"
+  mkdir -p "$DL_DIR"
+  RELEASE_JSON="$(curl -fsSL "https://api.github.com/repos/TwistedMind88/albatron/releases/tags/$TAG" 2>/dev/null || true)"
+  EXE_URL="$(echo "$RELEASE_JSON" | grep -o '"browser_download_url": *"[^"]*-setup\.exe"' | cut -d'"' -f4 | head -1)"
+  SIG_URL="$(echo "$RELEASE_JSON" | grep -o '"browser_download_url": *"[^"]*-setup\.exe\.sig"' | cut -d'"' -f4 | head -1)"
+  if [ -n "$EXE_URL" ] && [ -n "$SIG_URL" ]; then
+    if curl -fsSL "$EXE_URL" -o "$DL_DIR/albatron-setup.exe.tmp" \
+       && curl -fsSL "$SIG_URL" -o "$DL_DIR/albatron-setup.exe.sig.tmp"; then
+      mv "$DL_DIR/albatron-setup.exe.tmp" "$DL_DIR/albatron-setup.exe"
+      mv "$DL_DIR/albatron-setup.exe.sig.tmp" "$DL_DIR/albatron-setup.exe.sig"
+      info "desktop instalater spreman u $DL_DIR"
+    else
+      rm -f "$DL_DIR/albatron-setup.exe.tmp" "$DL_DIR/albatron-setup.exe.sig.tmp"
+      warn "preuzimanje desktop instalatera nije uspelo - preskacem (postojeci fajlovi ostaju)"
+    fi
+  else
+    warn "desktop instalater nije objavljen za $TAG - preskacem"
+  fi
+  chown -R "$APP_USER:$APP_USER" "$DL_DIR"
+fi
+
 # ---------- baza (samo sveza instalacija) ----------
 if [ "$MODE" = "install" ]; then
   info "podesavam PostgreSQL rolu i bazu"

@@ -1,5 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { loginSchema } from "@albatron/shared";
+import { appVersion } from "../../version.js";
+import { desktopDostupan } from "../download/routes.js";
 import { requestToken } from "./guard.js";
 import { verifyPassword } from "./password.js";
 import {
@@ -42,7 +44,13 @@ export async function authRoutes(app: FastifyInstance) {
     } catch {
       // DATABASE_URL nije URL format - ostaje podrazumevano ime
     }
-    return { ok: true, app: "albatron", baze: [baza] };
+    return {
+      ok: true,
+      app: "albatron",
+      baze: [baza],
+      version: appVersion,
+      desktopDostupan: desktopDostupan(),
+    };
   });
 
   app.post("/api/auth/logout", async (req, reply) => {

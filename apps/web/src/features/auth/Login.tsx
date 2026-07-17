@@ -1,14 +1,18 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { SessionUser } from "@albatron/shared";
 import { api, apiBase, ApiError, setApiToken } from "../../api";
 import { aktivirajSesiju, napraviUrl, sacuvajSesije, ucitajSesije, type ServerSesija } from "./serverSesije";
 
-export function Login({ onLogin }: { onLogin: (user: SessionUser) => void }) {
+const jeTauri = "__TAURI_INTERNALS__" in window;
+
+type ServerInfo = { ok?: boolean; version?: string; desktopDostupan?: boolean };
+
+// Forma za prijavu - koristi je i login ekran i popup istekle sesije (App)
+export function PrijavaForma({ onLogin }: { onLogin: (user: SessionUser) => void }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [serveri, setServeri] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -28,39 +32,61 @@ export function Login({ onLogin }: { onLogin: (user: SessionUser) => void }) {
     }
   }
 
+  return (
+    <form onSubmit={submit}>
+      <label className="field">
+        Korisnicko ime
+        <input
+          className="input"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          autoFocus
+        />
+      </label>
+      <label className="field">
+        Lozinka
+        <input
+          className="input"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+      </label>
+      {error && <div className="login-error">{error}</div>}
+      <button
+        className="btn primary"
+        disabled={busy}
+        style={{ justifyContent: "center", width: "100%" }}
+      >
+        Prijava
+      </button>
+    </form>
+  );
+}
+
+export function Login({ onLogin }: { onLogin: (user: SessionUser) => void }) {
+  const [serveri, setServeri] = useState(false);
+  const [info, setInfo] = useState<ServerInfo | null>(null);
+
+  useEffect(() => {
+    api<ServerInfo>("/api/server-info")
+      .then(setInfo)
+      .catch(() => {});
+  }, []);
+
   const aktivna = ucitajSesije().find((s) => s.url === apiBase);
 
   return (
     <div className="login-screen">
-      <form className="login-card" onSubmit={submit}>
+      <div className="login-card">
         <h1>Albatron</h1>
         {apiBase && (
           <p className="subtle" style={{ fontSize: 11.5, margin: "0 0 8px" }}>
             Server: {aktivna ? aktivna.naziv : apiBase}
           </p>
         )}
-        <label className="field">
-          Korisnicko ime
-          <input
-            className="input"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            autoFocus
-          />
-        </label>
-        <label className="field">
-          Lozinka
-          <input
-            className="input"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </label>
-        {error && <div className="login-error">{error}</div>}
-        <button className="btn primary" disabled={busy} style={{ justifyContent: "center" }}>
-          Prijava
-        </button>
+        {jeTauri && info?.version && <DesktopAzuriranje serverVerzija={info.version} />}
+        <PrijavaForma onLogin={onLogin} />
         <a
           className="subtle"
           style={{ fontSize: 11, marginTop: 10, textAlign: "center", cursor: "pointer", display: "block" }}
@@ -68,8 +94,89 @@ export function Login({ onLogin }: { onLogin: (user: SessionUser) => void }) {
         >
           Podešavanja servera
         </a>
-      </form>
+        {!jeTauri && info?.desktopDostupan && (
+          <a
+            className="subtle"
+            href={`${apiBase}/download/albatron-setup.exe`}
+            style={{ fontSize: 11, marginTop: 6, textAlign: "center", display: "block" }}
+          >
+            Preuzmi desktop verziju aplikacije za Windows
+          </a>
+        )}
+      </div>
       {serveri && <ServerPodesavanja onClose={() => setServeri(false)} />}
+    </div>
+  );
+}
+
+// a < b za verzije oblika X.Y.Z
+function starijaVerzija(a: string, b: string) {
+  const pa = a.split(".").map(Number);
+  const pb = b.split(".").map(Number);
+  for (let i = 0; i < 3; i++) {
+    if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) < (pb[i] ?? 0);
+  }
+  return false;
+}
+
+// Desktop (Tauri): poredjenje verzije aplikacije sa serverom + dugme za auto-update.
+// Update ide preko lokalnog servera (/updates/latest.json), Rust komanda "azuriraj".
+function DesktopAzuriranje({ serverVerzija }: { serverVerzija: string }) {
+  const [mojaVerzija, setMojaVerzija] = useState("");
+  const [radi, setRadi] = useState(false);
+  const [progres, setProgres] = useState("");
+  const [greska, setGreska] = useState("");
+
+  useEffect(() => {
+    import("@tauri-apps/api/app")
+      .then((m) => m.getVersion())
+      .then(setMojaVerzija)
+      .catch(() => {});
+  }, []);
+
+  if (!mojaVerzija || !starijaVerzija(mojaVerzija, serverVerzija)) return null;
+
+  async function azuriraj() {
+    setRadi(true);
+    setGreska("");
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const { listen } = await import("@tauri-apps/api/event");
+      const odjava = await listen<[number, number | null]>("update-progres", (e) => {
+        const [preuzeto, ukupno] = e.payload;
+        setProgres(
+          ukupno
+            ? `${Math.round((preuzeto / ukupno) * 100)}%`
+            : `${(preuzeto / 1024 / 1024).toFixed(1)} MB`,
+        );
+      });
+      try {
+        // uspeh restartuje aplikaciju, pa se ovde ne vracamo
+        await invoke("azuriraj", { url: `${apiBase}/updates/latest.json` });
+      } finally {
+        odjava();
+      }
+    } catch (err) {
+      setGreska(typeof err === "string" ? err : "Ažuriranje nije uspelo");
+      setRadi(false);
+    }
+  }
+
+  return (
+    <div style={{ fontSize: 12, margin: "0 0 10px", padding: 8, background: "var(--panel-2, #f4f6f8)", borderRadius: 6 }}>
+      <p style={{ margin: "0 0 6px" }}>
+        Vaša desktop verzija ({mojaVerzija}) je starija od verzije na serveru ({serverVerzija}).
+      </p>
+      <button
+        type="button"
+        className="btn primary"
+        disabled={radi}
+        style={{ justifyContent: "center", width: "100%" }}
+        onClick={azuriraj}
+      >
+        {radi ? `Ažuriranje... ${progres}` : "Ažuriraj"}
+      </button>
+      {greska && <p style={{ margin: "6px 0 0", color: "var(--danger, #c33)" }}>{greska}</p>}
     </div>
   );
 }
