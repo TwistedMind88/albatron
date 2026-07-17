@@ -2,8 +2,10 @@ import type { FastifyInstance } from "fastify";
 import { and, asc, desc, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { DOC_MODULI, formatirajBroj, podrazumevaniFormat } from "@albatron/shared";
+import ExcelJS from "exceljs";
 import { db, schema } from "../../db/index.js";
 import { requireAnyPrivilege, requirePrivilege } from "../auth/guard.js";
+import { getRfqSablon } from "../podesavanja/rfqSablon.js";
 import { getIstorija, logChanges } from "../artikli/service.js";
 import { knjiziUlaz, upisiEvidencijuPorucenog } from "./nabavka.js";
 import { avansiRacuna, iskoriscenoAvansa, knjiziIzlaz, proveriSerijske, veziAvans } from "./prodaja.js";
@@ -451,13 +453,23 @@ export async function dokumentiRoutes(app: FastifyInstance) {
     return getIstorija("dokument", id);
   });
 
-  // RFQ export (faza 15, RP7.1): stavke kalkulacije sa SKU iz cenovnika dobavljaca dokumenta
+  // Export upita za dobavljaca po xlsx sablonu (zamenio genericki RFQ iz faze 15):
+  // template i sva mapiranja dolaze iz konfiguracije u bazi (vidi rfqSablon.ts),
+  // popunjava se samo vrednost postojecih celija pa stilovi/merge ostaju netaknuti
   app.get("/api/dokumenti/:id/rfq", { preHandler: read }, async (req, reply) => {
+    const cfg = await getRfqSablon();
+    if (!cfg) return reply.code(404).send({ error: "Upit po šablonu nije podešen" });
     const id = Number((req.params as { id: string }).id);
     const [doc] = await db.select().from(schema.documents).where(eq(schema.documents.id, id));
     if (!doc) return reply.code(404).send({ error: "Dokument ne postoji" });
-    if (doc.tip !== "kalkulacija") return reply.code(400).send({ error: "RFQ export je dostupan samo na kalkulaciji" });
-    if (!doc.klijentId) return reply.code(400).send({ error: "Dokument nema vezanog dobavljača" });
+    if (doc.tip !== "kalkulacija") return reply.code(400).send({ error: "Export upita je dostupan samo na kalkulaciji" });
+    const [dobavljac] = await db
+      .select({ id: schema.subjects.id })
+      .from(schema.subjects)
+      .where(eq(schema.subjects.naziv, cfg.dobavljacNaziv));
+    if (!dobavljac) {
+      return reply.code(400).send({ error: `Dobavljač "${cfg.dobavljacNaziv}" ne postoji u šifarniku subjekata` });
+    }
     const items = await db
       .select({
         articleId: schema.documentItems.articleId,
@@ -467,32 +479,107 @@ export async function dokumentiRoutes(app: FastifyInstance) {
       .from(schema.documentItems)
       .where(eq(schema.documentItems.documentId, id))
       .orderBy(asc(schema.documentItems.pozicija));
-    // SKU u cenovniku dobavljaca: articles.sku koji postoji u pricelist_items tog dobavljaca
-    const uCenovniku = await db
-      .selectDistinct({ sku: schema.pricelistItems.sku })
-      .from(schema.pricelistItems)
-      .innerJoin(schema.pricelists, eq(schema.pricelistItems.pricelistId, schema.pricelists.id))
-      .where(eq(schema.pricelists.dobavljacId, doc.klijentId));
-    const skuSet = new Set(uCenovniku.map((r) => r.sku));
     const artikalIds = items.map((i) => i.articleId).filter((x): x is number => x !== null);
     const artikli = artikalIds.length
       ? await db
-          .select({ id: schema.articles.id, sku: schema.articles.sku })
+          .select({
+            id: schema.articles.id,
+            sku: schema.articles.sku,
+            dobavljacId: schema.articles.dobavljacId,
+            glavnaKategorijaId: schema.articles.glavnaKategorijaId,
+          })
           .from(schema.articles)
           .where(inArray(schema.articles.id, artikalIds))
       : [];
-    const skuPoArtiklu = new Map(artikli.map((a) => [a.id, a.sku]));
-    return {
-      dobavljac: doc.klijentNaziv,
-      stavke: items.map((i) => {
-        const sku = i.articleId !== null ? skuPoArtiklu.get(i.articleId) : null;
-        return {
-          sku: sku && skuSet.has(sku) ? sku : null,
+    const artikalMap = new Map(artikli.map((a) => [a.id, a]));
+    const kategorije = await db
+      .select({ id: schema.categories.id, code: schema.categories.code, name: schema.categories.name })
+      .from(schema.categories);
+    const kategorijaMap = new Map(kategorije.map((k) => [k.id, k]));
+    const subjekti = await db.select({ id: schema.subjects.id, naziv: schema.subjects.naziv }).from(schema.subjects);
+    const subjektMap = new Map(subjekti.map((s) => [s.id, s.naziv]));
+
+    // sve provere odjednom - korisnik dobija kompletnu listu spornih stavki
+    const problemi: { naziv: string; problem: string }[] = [];
+    const slotovi = new Map<string, { sku: string; kolicina: number }[]>(cfg.sekcije.map((s) => [s.naslov, []]));
+    for (const i of items) {
+      const a = i.articleId !== null ? artikalMap.get(i.articleId) : undefined;
+      if (!a) {
+        problemi.push({ naziv: i.naziv, problem: "stavka nije vezana za artikal" });
+        continue;
+      }
+      if (a.dobavljacId !== dobavljac.id) {
+        const naziv = a.dobavljacId !== null ? (subjektMap.get(a.dobavljacId) ?? "?") : "nije postavljen";
+        problemi.push({ naziv: i.naziv, problem: `dobavljač: ${naziv}` });
+        continue;
+      }
+      if (!a.sku) {
+        problemi.push({ naziv: i.naziv, problem: "artikal nema SKU dobavljača" });
+        continue;
+      }
+      const kat = a.glavnaKategorijaId !== null ? kategorijaMap.get(a.glavnaKategorijaId) : undefined;
+      const kod = kat?.code ?? null;
+      const sekcija = kod ? cfg.sekcije.find((s) => s.kodPrefiksi.some((p) => kod.startsWith(p))) : undefined;
+      if (!sekcija) {
+        problemi.push({
           naziv: i.naziv,
-          kolicina: Number(i.kolicina),
-        };
-      }),
+          problem: kat
+            ? `kategorija ${kat.code ?? ""} ${kat.name} nije mapirana ni u jednu sekciju upita`
+            : "artikal nema glavnu kategoriju",
+        });
+        continue;
+      }
+      slotovi.get(sekcija.naslov)!.push({ sku: a.sku, kolicina: Number(i.kolicina) });
+    }
+    for (const s of cfg.sekcije) {
+      const n = slotovi.get(s.naslov)!.length;
+      if (n > s.slotova) problemi.push({ naziv: s.naslov, problem: `${n} stavki, šablon prima ${s.slotova}` });
+    }
+    if (problemi.length) return reply.code(400).send({ error: "Upit nije moguće generisati", problemi });
+
+    const wb = new ExcelJS.Workbook();
+    // exceljs tipovi nose stariji @types/node (Buffer bez generika) - cast je bezopasan
+    await wb.xlsx.load(Buffer.from(cfg.templateBase64, "base64") as unknown as Parameters<typeof wb.xlsx.load>[0]);
+    const ws = wb.getWorksheet(cfg.sheet);
+    if (!ws) return reply.code(400).send({ error: `Šablon nema sheet "${cfg.sheet}"` });
+
+    const subjekt = doc.klijentId
+      ? (
+          await db
+            .select({ drzava: schema.subjects.drzava })
+            .from(schema.subjects)
+            .where(eq(schema.subjects.id, doc.klijentId))
+        )[0]
+      : undefined;
+    const kontakt = (doc.kontaktOsoba ?? "").trim();
+    const razmak = kontakt.indexOf(" ");
+    const vrednosti: Record<string, string> = {
+      puniNaziv: doc.klijentPuniNaziv || doc.klijentNaziv || "",
+      adresa: doc.klijentAdresa ?? "",
+      drzava: subjekt?.drzava ?? "",
+      grad: doc.klijentGrad ?? "",
+      postanskiBroj: doc.klijentPostanskiBroj ?? "",
+      kontaktIme: razmak === -1 ? kontakt : kontakt.slice(0, razmak),
+      kontaktPrezime: razmak === -1 ? "" : kontakt.slice(razmak + 1).trim(),
+      kontaktEmail: doc.kontaktEmail ?? "",
+      kontaktTelefon: doc.kontaktTelefon ?? "",
     };
+    for (const [polje, adresa] of Object.entries(cfg.polja)) {
+      const v = vrednosti[polje];
+      if (v) ws.getCell(adresa).value = v;
+    }
+    for (const s of cfg.sekcije) {
+      slotovi.get(s.naslov)!.forEach((stavka, idx) => {
+        ws.getCell(`${cfg.pnKolona}${s.prviRed + idx}`).value = stavka.sku;
+        ws.getCell(`${cfg.kolicinaKolona}${s.prviRed + idx}`).value = stavka.kolicina;
+      });
+    }
+    const buf = await wb.xlsx.writeBuffer();
+    const imeFajla = `${cfg.imeFajla}-${doc.broj.replace(/[^\w-]/g, "_")}.xlsx`;
+    return reply
+      .header("Content-Disposition", `attachment; filename="${imeFajla}"`)
+      .type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+      .send(Buffer.from(buf));
   });
 
   // Kloniranje (brief 7.1 dodatne opcije) - novi broj, status "u izradi", bez veza

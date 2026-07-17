@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import * as XLSX from "xlsx";
 import { api, apiFetch, ApiError } from "../../api";
 import { sacuvajFajl } from "../../download";
 import Toggle from "../../components/Toggle";
@@ -281,6 +280,8 @@ export function DokumentView({
 
   // brisanje dokumenta (faza 16, RP6): posebna privilegija "brisanje_dokumenata"
   const [brisanjePopup, setBrisanjePopup] = useState(false);
+  // export upita po sablonu: lista spornih stavki iz 400 odgovora (mora biti vidljiva cela)
+  const [rfqProblemi, setRfqProblemi] = useState<{ naziv: string; problem: string }[] | null>(null);
   const me = useQuery({
     queryKey: ["auth-me"],
     queryFn: () => api<{ isAdmin: boolean; privileges: Record<string, string> }>("/api/auth/me"),
@@ -335,6 +336,14 @@ export function DokumentView({
     queryFn: () => api<ArtikalOpcija[]>("/api/artikli-pretraga"),
   });
   const moduli = useQuery({ queryKey: ["moduli"], queryFn: () => api<{ zalihe: boolean }>("/api/moduli") });
+
+  // export upita po sablonu dobavljaca: konfiguracija zivi u bazi (rfqSablon.ts na serveru);
+  // null = nije podeseno, meni nema opciju
+  const rfqSablon = useQuery({
+    queryKey: ["rfq-sablon"],
+    queryFn: () => api<{ label: string; imeFajla: string } | null>("/api/rfq-sablon"),
+    enabled: jeKalk,
+  });
   // izbor kolona stavki po korisniku i tipu dokumenta (stavka 15)
   const qc = useQueryClient();
   type KolonePrefs = { hidden: string[]; order?: string[]; width?: Record<string, number> };
@@ -698,26 +707,29 @@ export function DokumentView({
     }
   }
 
-  // RFQ export (faza 15, RP7.1): xlsx upit dobavljacu sa kalkulacije
+  // Export upita po xlsx sablonu dobavljaca (zamenio genericki RFQ iz faze 15):
+  // server popunjava template iz konfiguracije i vraca gotov fajl; 400 sa listom
+  // problema (pogresan dobavljac, bez SKU, nemapirana kategorija...) ide u popup
   async function exportRfq() {
     setError("");
     setPoruka("");
     try {
-      const rfq = await api<{ dobavljac: string; stavke: { sku: string | null; naziv: string; kolicina: number }[] }>(
-        `/api/dokumenti/${savedId}/rfq`,
-      );
-      const rows = rfq.stavke.map((s) => ({
-        "SKU dobavljača": s.sku ?? "",
-        Količina: s.kolicina,
-        Napomena: s.sku === null ? s.naziv : "",
-      }));
-      const ws = XLSX.utils.json_to_sheet(rows);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Upit");
-      const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
-      await sacuvajFajl(`upit-${broj.replace(/[^\w-]/g, "_")}.xlsx`, new Blob([buf]));
-      const bezSku = rfq.stavke.filter((s) => s.sku === null).length;
-      setPoruka(bezSku ? `Upozorenje: ${bezSku} stavki nema SKU dobavljača (naziv je u koloni Napomena)` : "Upit exportovan");
+      const res = await apiFetch(`/api/dokumenti/${savedId}/rfq`);
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as {
+          error?: string;
+          problemi?: { naziv: string; problem: string }[];
+        } | null;
+        if (data?.problemi?.length) {
+          setRfqProblemi(data.problemi);
+          return;
+        }
+        throw new ApiError(res.status, data?.error ?? `Greška ${res.status}`);
+      }
+      const blob = await res.blob();
+      const prefiks = rfqSablon.data?.imeFajla ?? "upit";
+      await sacuvajFajl(`${prefiks}-${broj.replace(/[^\w-]/g, "_")}.xlsx`, blob);
+      setPoruka("Upit exportovan");
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Greška pri exportu upita");
     }
@@ -804,6 +816,26 @@ export function DokumentView({
             <p>{lockPoruka}. Vaša izmena je poništena - pokušajte ponovo kada korisnik završi.</p>
             <div className="actions">
               <button className="btn primary" onClick={() => setLockPoruka("")}>
+                U redu
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {rfqProblemi && (
+        <div className="overlay">
+          <div className="popup" style={{ width: 480 }}>
+            <h2>Upit nije moguće generisati</h2>
+            <p>Ispravite sledeće stavke pa pokušajte ponovo:</p>
+            <ul style={{ maxHeight: 300, overflowY: "auto", margin: "8px 0", paddingLeft: 20 }}>
+              {rfqProblemi.map((p, i) => (
+                <li key={i} style={{ fontSize: 13, marginBottom: 4 }}>
+                  <strong>{p.naziv}</strong> - {p.problem}
+                </li>
+              ))}
+            </ul>
+            <div className="actions">
+              <button className="btn primary" onClick={() => setRfqProblemi(null)}>
                 U redu
               </button>
             </div>
@@ -906,9 +938,9 @@ export function DokumentView({
                   <button className="btn" onClick={kloniraj}>
                     Kloniraj
                   </button>
-                  {jeKalk && (
+                  {jeKalk && rfqSablon.data && (
                     <button className="btn" onClick={() => void exportRfq()}>
-                      Export upita za dobavljača
+                      {rfqSablon.data.label}
                     </button>
                   )}
                   {cilji.map((c) => (

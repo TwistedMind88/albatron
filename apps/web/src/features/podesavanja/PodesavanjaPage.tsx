@@ -11,6 +11,7 @@ import { Kategorije } from "./Kategorije";
 import { Numeracija } from "./Numeracija";
 import { Sabloni } from "./Sabloni";
 import { Moduli, SkladistaSekcija } from "./Moduli";
+import { UpitSablon } from "./UpitSablon";
 import { Uputstvo } from "./Uputstvo";
 
 // Layout podesavanja (brief 11): vertikalni meni pored glavnog sidebara,
@@ -27,6 +28,7 @@ const SECTIONS: { id: string; label: string; el: ComponentType; adminOnly?: bool
   { id: "skladista", label: "Skladišta", el: SkladistaSekcija },
   // korisnici preseljeni iz sidebara (faza 16, st. 48); vidi samo admin
   { id: "korisnici", label: "Korisnici", el: KorisniciPage, adminOnly: true },
+  { id: "upit-sablon", label: "Upit dobavljača", el: UpitSablon, adminOnly: true },
   { id: "uputstvo", label: "Uputstvo", el: Uputstvo },
 ];
 
