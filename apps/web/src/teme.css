@@ -3,6 +3,8 @@
 
 /* ---------- GRAFIT: moderan svetli, tamni graftini sidebar, safirni akcenat ---------- */
 .tema-grafit {
+  --font-ui: "Inter Variable", "Segoe UI", system-ui, sans-serif;
+  --font-naslov: "Space Grotesk Variable", "Segoe UI", system-ui, sans-serif;
   --bg: #f5f6f8;
   --surface: #ffffff;
   --line: #e5e7ec;
@@ -41,7 +43,8 @@
   --ok: #2f6b4a;
   --radius: 6px;
   --tabbar-bg: #f2eee6;
-  --font-ui: Georgia, "Times New Roman", serif;
+  --font-ui: "Instrument Sans Variable", "Segoe UI", system-ui, sans-serif;
+  --font-naslov: "Fraunces Variable", Georgia, serif;
 }
 /* pergament ima svetli sidebar - tamni tekst i tanke linije umesto belih */
 .tema-pergament .sidebar {
@@ -80,6 +83,8 @@
 
 /* ---------- KOKPIT: tamni tehnicki, tirkizni akcenat ---------- */
 .tema-kokpit {
+  --font-ui: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", Consolas, monospace;
   --bg: #0b0f14;
   --surface: #121924;
   --line: #1e2936;
@@ -176,6 +181,8 @@
 .tema-kokpit table.data th {
   background: #16202c;
   color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
 }
 .tema-kokpit .btn.primary {
   box-shadow: 0 0 12px rgba(45, 212, 191, 0.25);

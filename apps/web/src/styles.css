@@ -176,6 +176,7 @@ body {
   box-shadow: inset 2px 0 0 var(--accent);
 }
 .brand {
+  font-family: var(--font-naslov, var(--font-ui));
   padding: 14px 16px 10px;
   font-size: 15px;
   font-weight: 600;
@@ -416,6 +417,7 @@ body {
   margin-bottom: 12px;
 }
 .page-head h1 {
+  font-family: var(--font-naslov, var(--font-ui));
   font-size: 17px;
   font-weight: 600;
   margin: 0;
