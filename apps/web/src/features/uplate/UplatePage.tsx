@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
@@ -6,6 +6,7 @@ import { api, ApiError } from "../../api";
 import { sacuvajFajl } from "../../download";
 import { useTabs } from "../../store/tabs";
 import { Autocomplete } from "../../components/Autocomplete";
+import { useKolonePrefs } from "../../components/DataTable";
 import { FilterDugme, type FilterVrednosti } from "../../components/FilterDugme";
 import type { FilterDef } from "../dokumenti/common";
 
@@ -237,7 +238,55 @@ export function UplatePage() {
     openTab(sekcija, red.pozivNaBroj, { forceNew: true, payload: { openId: red.dokumentId } });
   }
 
-  const vidljive = KOLONE.filter((k) => !skrivene.has(k.key));
+  // redosled i sirine kolona (prevlacenje zaglavlja + resize rucica, kao DataTable)
+  const [redosled, setRedosled] = useState<string[]>(KOLONE.map((k) => k.key));
+  const [sirine, setSirine] = useState<Record<string, number>>({});
+  const [dragKol, setDragKol] = useState<string | null>(null);
+  const resized = Object.keys(sirine).length > 0;
+
+  // pamcenje po korisniku (isti mehanizam kao DataTable)
+  const { saved, save } = useKolonePrefs("uplate");
+  const primenjeno = useRef(false);
+  useEffect(() => {
+    if (!saved || primenjeno.current) return;
+    primenjeno.current = true;
+    if (saved.order?.length) {
+      // ukloni nepostojece, dodaj nove kolone na kraj (buducnost-sigurno)
+      const poznate = saved.order.filter((k) => KOLONE.some((x) => x.key === k));
+      const nove = KOLONE.map((x) => x.key).filter((k) => !poznate.includes(k));
+      setRedosled([...poznate, ...nove]);
+    }
+    if (saved.sizing) setSirine(saved.sizing);
+  }, [saved]);
+  const prviRender = useRef(true);
+  useEffect(() => {
+    if (prviRender.current) {
+      prviRender.current = false;
+      return;
+    }
+    const t = setTimeout(() => save(redosled, sirine), 600);
+    return () => clearTimeout(t);
+  }, [redosled, sirine]);
+
+  const vidljive = redosled
+    .map((key) => KOLONE.find((k) => k.key === key)!)
+    .filter((k) => !skrivene.has(k.key));
+
+  function pocniResize(e: React.MouseEvent, key: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    const th = (e.currentTarget as HTMLElement).parentElement!;
+    const startX = e.clientX;
+    const startW = th.offsetWidth;
+    const move = (ev: MouseEvent) =>
+      setSirine((s) => ({ ...s, [key]: Math.max(40, startW + ev.clientX - startX) }));
+    const up = () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  }
 
   // referent/avans/napomena: editabilni i za read korisnika (read sme PUT ovih polja)
   function celijaOtkljucana(kljuc: string, f: Forma, set: (f: Forma) => void) {
@@ -507,12 +556,34 @@ export function UplatePage() {
         </div>
       )}
       <div className="tablewrap">
-        <table className="data">
+        <table className={resized ? "data fixed" : "data"}>
           <thead>
             <tr>
-              {selectMod && <th />}
+              {selectMod && <th style={resized ? { width: 28 } : undefined} />}
               {vidljive.map((k) => (
-                <th key={k.key}>{k.label}</th>
+                <th
+                  key={k.key}
+                  style={resized ? { width: sirine[k.key] ?? 120 } : undefined}
+                  draggable
+                  onDragStart={() => setDragKol(k.key)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => {
+                    if (!dragKol || dragKol === k.key) return;
+                    const next = [...redosled];
+                    next.splice(next.indexOf(dragKol), 1);
+                    next.splice(next.indexOf(k.key), 0, dragKol);
+                    setRedosled(next);
+                    setDragKol(null);
+                  }}
+                >
+                  {k.label}
+                  <span
+                    className="col-resizer"
+                    onMouseDown={(e) => pocniResize(e, k.key)}
+                    draggable={false}
+                    onDragStart={(e) => e.preventDefault()}
+                  />
+                </th>
               ))}
             </tr>
           </thead>

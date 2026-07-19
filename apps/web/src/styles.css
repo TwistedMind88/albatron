@@ -527,6 +527,26 @@ table.data.stavke td {
 table.data.stavke .input {
   padding: 2px 4px;
 }
+.col-resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+}
+.col-resizer:hover {
+  background: var(--accent-soft);
+}
+table.data.fixed {
+  table-layout: fixed;
+}
+table.data.fixed th,
+table.data.fixed td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 table.data tbody tr:hover {
   background: var(--accent-soft);
 }

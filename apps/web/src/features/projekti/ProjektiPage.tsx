@@ -104,6 +104,7 @@ export function ProjektiPage() {
         <h1>Projekti</h1>
       </div>
       <DataTable
+        tableId="projekti"
         data={query.data ?? []}
         columns={kolone}
         onRowDoubleClick={(p) => setOpenId(p.id)}

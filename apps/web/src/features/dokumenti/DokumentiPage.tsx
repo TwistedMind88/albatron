@@ -125,6 +125,7 @@ export function DokumentiPage({ tip, payload }: { tip: string; payload?: unknown
         <h1>{TIP_INFO[tip]?.mnozina ?? tip}</h1>
       </div>
       <DataTable
+        tableId={`dokumenti-${tip}`}
         data={data}
         columns={COLUMNS}
         columnPicker

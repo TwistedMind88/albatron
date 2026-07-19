@@ -106,6 +106,7 @@ export function KorisniciPage() {
         <Grupe />
       ) : (
         <DataTable
+          tableId="korisnici"
           data={korisnici.data ?? []}
           columns={columns(setEditing, role.data ?? [])}
           onRowDoubleClick={(row) => setEditing(row)}

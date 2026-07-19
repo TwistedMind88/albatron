@@ -48,6 +48,7 @@ export function CenovniciPage() {
         <h1>Cenovnici</h1>
       </div>
       <DataTable
+        tableId="cenovnici"
         data={query.data ?? []}
         columns={COLUMNS}
         onRowDoubleClick={(c) => setOpenId(c.id)}

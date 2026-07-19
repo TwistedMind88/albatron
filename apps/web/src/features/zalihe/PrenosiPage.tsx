@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { ColumnDef } from "@tanstack/react-table";
 import { api, ApiError } from "../../api";
+import { DataTable } from "../../components/DataTable";
 import { ArtikalAutocomplete, type ArtikalOpcija } from "../../components/ArtikalAutocomplete";
 import { IzvestajPopup } from "../dokumenti/IzvestajPopup";
 import type { Skladiste } from "../podesavanja/Moduli";
@@ -44,6 +46,27 @@ export function PrenosiPage() {
   if (view === "novi") return <NoviPrenos onDone={() => setView("lista")} />;
   if (typeof view === "number") return <PrenosIzmena id={view} onBack={() => setView("lista")} />;
 
+  const kolone: ColumnDef<PrenosRed, any>[] = [
+    {
+      accessorKey: "broj",
+      header: "Broj",
+      cell: ({ row }) => (
+        <a className="link" onClick={() => setView(row.original.id)}>
+          {row.original.broj}
+        </a>
+      ),
+    },
+    {
+      accessorKey: "datum",
+      header: "Datum",
+      cell: ({ getValue }) => new Date(getValue<string>()).toLocaleDateString("sr-RS"),
+    },
+    { accessorKey: "izdajno", header: "Izdajno" },
+    { accessorKey: "prijemno", header: "Prijemno" },
+    { accessorKey: "referent", header: "Referent", cell: ({ getValue }) => getValue<string | null>() ?? "" },
+    { accessorKey: "napomena", header: "Napomena" },
+  ];
+
   return (
     <>
       <div className="page-head">
@@ -53,43 +76,7 @@ export function PrenosiPage() {
           + Novi prenos
         </button>
       </div>
-      <div className="tablewrap">
-        <table className="data">
-          <thead>
-            <tr>
-              <th>Broj</th>
-              <th>Datum</th>
-              <th>Izdajno</th>
-              <th>Prijemno</th>
-              <th>Referent</th>
-              <th>Napomena</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(prenosi.data ?? []).map((p) => (
-              <tr key={p.id} onDoubleClick={() => setView(p.id)}>
-                <td>
-                  <a className="link" onClick={() => setView(p.id)}>
-                    {p.broj}
-                  </a>
-                </td>
-                <td>{new Date(p.datum).toLocaleDateString("sr-RS")}</td>
-                <td>{p.izdajno}</td>
-                <td>{p.prijemno}</td>
-                <td>{p.referent ?? ""}</td>
-                <td>{p.napomena}</td>
-              </tr>
-            ))}
-            {(prenosi.data ?? []).length === 0 && (
-              <tr>
-                <td colSpan={6} className="subtle">
-                  Nema prenosa.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DataTable data={prenosi.data ?? []} columns={kolone} tableId="prenosi" onRowDoubleClick={(p) => setView(p.id)} />
     </>
   );
 }

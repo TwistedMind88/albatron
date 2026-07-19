@@ -143,6 +143,7 @@ export function ArtikliPage({ payload }: { payload?: unknown }) {
         <h1>Artikli</h1>
       </div>
       <DataTable
+        tableId="artikli"
         data={data}
         columns={columns(setOpenId)}
         columnPicker

@@ -278,6 +278,7 @@ export function ObracuniPage() {
             </Polje>
           </div>
           <DataTable
+            tableId="obracuni-dokumenti"
             data={dokQuery.data ?? []}
             columns={dokKolone}
             onRowDoubleClick={(d) => setOpenDoc({ id: d.id, tip: d.tip })}
@@ -316,7 +317,7 @@ export function ObracuniPage() {
               <input type="date" className="input" value={af.datumDo} onChange={(e) => setAf({ ...af, datumDo: e.target.value })} />
             </Polje>
           </div>
-          <DataTable data={artQuery.data ?? []} columns={artKolone} />
+          <DataTable tableId="obracuni-artikli" data={artQuery.data ?? []} columns={artKolone} />
         </div>
       )}
     </>
@@ -436,9 +437,10 @@ export function ObracunRezultat({ payload }: { payload?: unknown }) {
         <h1>{vrsta === "artikli" ? "Obračun: artikli" : "Obračun: dokumenti"}</h1>
       </div>
       {vrsta === "artikli" ? (
-        <DataTable data={(query.data ?? []) as ArtRed[]} columns={artKolone} />
+        <DataTable tableId="obracuni-artikli" data={(query.data ?? []) as ArtRed[]} columns={artKolone} />
       ) : (
         <DataTable
+          tableId="obracuni-dokumenti"
           data={(query.data ?? []) as DokRed[]}
           columns={dokKolone}
           onRowDoubleClick={(d) => setOpenDoc({ id: d.id, tip: d.tip })}

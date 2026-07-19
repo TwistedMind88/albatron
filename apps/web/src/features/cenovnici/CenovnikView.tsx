@@ -115,6 +115,7 @@ export function CenovnikView({ id, onBack }: { id: number; onBack: () => void })
       </p>
       {poruka && <p style={{ fontSize: 12, marginBottom: 8, color: "var(--danger)" }}>{poruka}</p>}
       <DataTable
+        tableId="cenovnik-stavke"
         data={c.items}
         columns={COLUMNS}
         onRowDoubleClick={(s) => setIstorijaSku(s.sku)}

@@ -125,6 +125,7 @@ export function SubjektiPage({ uloga, payload }: { uloga: "klijent" | "dobavljac
         <h1>{naslov}</h1>
       </div>
       <DataTable
+        tableId="subjekti"
         data={query.data ?? []}
         columns={allColumns(setOpenId)}
         columnPicker
