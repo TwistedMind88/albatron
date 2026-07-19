@@ -1,7 +1,11 @@
 import { useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { ColumnDef } from "@tanstack/react-table";
 import * as XLSX from "xlsx";
 import { api, ApiError } from "../../api";
+import { DataTable } from "../../components/DataTable";
+import { FilterDugme, type FilterVrednosti } from "../../components/FilterDugme";
+import type { FilterDef } from "../dokumenti/common";
 import { MultiPick } from "../../components/MultiPick";
 import { sacuvajFajl } from "../../download";
 import { statusBadge } from "./PopisiPage";
@@ -65,10 +69,7 @@ export function PopisView({ id, onBack }: { id: number; onBack: () => void }) {
   const subjekti = useQuery({ queryKey: ["subjekti"], queryFn: () => api<Subjekt[]>("/api/subjekti") });
 
   const [tab, setTab] = useState<Tab>("lista");
-  const [fSkladista, setFSkladista] = useState<number[]>([]);
-  const [fDobavljaci, setFDobavljaci] = useState<number[]>([]);
-  const [fKategorije, setFKategorije] = useState<number[]>([]);
-  const [pretraga, setPretraga] = useState("");
+  const [filteri, setFilteri] = useState<FilterVrednosti>({});
   // nesnimljene izmene: "articleId:warehouseId" -> popisano
   const [dirty, setDirty] = useState<Map<string, number | null>>(new Map());
   const [error, setError] = useState("");
@@ -111,10 +112,15 @@ export function PopisView({ id, onBack }: { id: number; onBack: () => void }) {
   if (!podaci) return <div className="placeholder">Učitavanje...</div>;
 
   const skladista = podaci.skladista;
-  const vidljivaSkladista = fSkladista.length ? skladista.filter((s) => fSkladista.includes(s.id)) : skladista;
 
   const katNaziv = (kid: number | null) => (kategorije.data ?? []).find((k) => k.id === kid)?.name ?? "";
   const dobNaziv = (did: number | null) => (subjekti.data ?? []).find((s) => s.id === did)?.naziv ?? "";
+
+  // filteri na dugme kao u pregledu dokumenata; vrednosti su nazivi (stringovi)
+  const fSklad = (filteri["skladiste"] as string[] | undefined) ?? [];
+  const fDob = (filteri["dobavljac"] as string[] | undefined) ?? [];
+  const fKat = (filteri["kategorija"] as string[] | undefined) ?? [];
+  const vidljivaSkladista = fSklad.length ? skladista.filter((s) => fSklad.includes(s.naziv)) : skladista;
 
   // trenutna vrednost celije: dirty ima prednost nad snimljenim
   function vrednost(r: Red, wid: number): number | null {
@@ -123,15 +129,9 @@ export function PopisView({ id, onBack }: { id: number; onBack: () => void }) {
     return r.poSkladistu.get(wid)?.popisano ?? null;
   }
 
-  const t = pretraga.trim().toLowerCase();
   const filtrirani = redovi.filter((r) => {
-    if (t && !r.ident.toLowerCase().includes(t) && !r.naziv.toLowerCase().includes(t)) return false;
-    if (fDobavljaci.length && !fDobavljaci.includes(r.dobavljacId ?? -1)) return false;
-    if (
-      fKategorije.length &&
-      !fKategorije.includes(r.glavnaKategorijaId ?? -1) &&
-      !fKategorije.includes(r.sekundarnaKategorijaId ?? -1)
-    )
+    if (fDob.length && !fDob.includes(dobNaziv(r.dobavljacId))) return false;
+    if (fKat.length && !fKat.includes(katNaziv(r.glavnaKategorijaId)) && !fKat.includes(katNaziv(r.sekundarnaKategorijaId)))
       return false;
     if (tab === "nepopisano") return vidljivaSkladista.some((s) => vrednost(r, s.id) === null);
     if (tab === "popisano") return vidljivaSkladista.some((s) => vrednost(r, s.id) !== null);
@@ -261,6 +261,80 @@ export function PopisView({ id, onBack }: { id: number; onBack: () => void }) {
     { id: "popisano", label: "Popisano" },
   ];
 
+  const filterDefs: FilterDef[] = [
+    { key: "skladiste", label: "Skladište", vrsta: "multi" },
+    { key: "dobavljac", label: "Dobavljač", vrsta: "multi" },
+    { key: "kategorija", label: "Kategorija", vrsta: "multi" },
+  ];
+  const filterOpcije: Record<string, string[]> = {
+    skladiste: skladista.map((s) => s.naziv),
+    dobavljac: [...new Set(redovi.map((r) => dobNaziv(r.dobavljacId)))].sort(),
+    kategorija: [
+      ...new Set(redovi.flatMap((r) => [katNaziv(r.glavnaKategorijaId), katNaziv(r.sekundarnaKategorijaId)])),
+    ].sort(),
+  };
+
+  // ista tabela kao liste stavki u dokumentima: resize, reorder, izbor kolona,
+  // pamcenje po korisniku (tableId); kolone po skladistu su dinamicke
+  const editable = uToku && tab !== "lista";
+  const kolone: (ColumnDef<Red, any> & { defaultVisible?: boolean })[] = [
+    { accessorKey: "ident", header: "Ident", defaultVisible: true },
+    { accessorKey: "naziv", header: "Naziv", defaultVisible: true },
+    { id: "glavnaKat", header: "Glavna kat.", accessorFn: (r: Red) => katNaziv(r.glavnaKategorijaId), defaultVisible: true },
+    { id: "sekundarnaKat", header: "Sekundarna kat.", accessorFn: (r: Red) => katNaziv(r.sekundarnaKategorijaId), defaultVisible: true },
+    { id: "dobavljac", header: "Dobavljač", accessorFn: (r: Red) => dobNaziv(r.dobavljacId) },
+    {
+      id: "serijski",
+      header: "Serijski",
+      accessorFn: (r: Red) => (r.serijski ? 1 : 0),
+      defaultVisible: true,
+      cell: ({ row }) =>
+        row.original.serijski && (
+          <button className="btn" style={{ padding: "0 6px" }} onClick={() => setSerijskiZa(row.original)}>
+            Lista
+          </button>
+        ),
+    },
+    ...vidljivaSkladista.map<ColumnDef<Red, any> & { defaultVisible?: boolean }>((s) => ({
+      id: `o${s.id}`,
+      header: `Očekivano ${s.naziv}`,
+      accessorFn: (r: Red) => r.poSkladistu.get(s.id)?.ocekivano ?? 0,
+      defaultVisible: true,
+      cell: ({ row }) => <div style={{ textAlign: "right" }}>{row.original.poSkladistu.get(s.id)?.ocekivano ?? 0}</div>,
+    })),
+    ...vidljivaSkladista.map<ColumnDef<Red, any> & { defaultVisible?: boolean }>((s, si) => ({
+      id: `p${s.id}`,
+      header: `Popisano ${s.naziv}`,
+      accessorFn: (r: Red) => vrednost(r, s.id),
+      defaultVisible: true,
+      cell: ({ row }) => (
+        <div style={{ textAlign: "right" }}>
+          {editable ? (
+            <CellPopis
+              value={vrednost(row.original, s.id)}
+              r={row.index}
+              c={si}
+              onCommit={(v) => upisi(row.original, s.id, v)}
+            />
+          ) : (
+            (vrednost(row.original, s.id) ?? "")
+          )}
+        </div>
+      ),
+    })),
+    {
+      id: "datumPopisa",
+      header: "Datum popisa",
+      accessorFn: (r: Red) =>
+        [...r.poSkladistu.values()]
+          .map((c) => c.datumPopisa)
+          .filter((d): d is string => !!d)
+          .map((d) => new Date(d).toLocaleDateString("sr-RS"))
+          .filter((v, i, a) => a.indexOf(v) === i)
+          .join(", "),
+    },
+  ];
+
   return (
     <>
       <button className="btn" style={{ marginBottom: 8 }} onClick={nazad}>
@@ -322,127 +396,23 @@ export function PopisView({ id, onBack }: { id: number; onBack: () => void }) {
       />
       {podaci.napomena && <p className="subtle" style={{ marginTop: 0 }}>{podaci.napomena}</p>}
 
-      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8, flexWrap: "wrap" }}>
-        {TABOVI.map((tb) => (
-          <button key={tb.id} className={`btn${tab === tb.id ? " primary" : ""}`} onClick={() => setTab(tb.id)}>
-            {tb.label}
-          </button>
-        ))}
-        <div className="grow" />
-        <input
-          className="input"
-          placeholder="Pretraga (ident, naziv)..."
-          value={pretraga}
-          onChange={(e) => setPretraga(e.target.value)}
-          style={{ width: 200 }}
-        />
-        <div style={{ width: 160 }}>
-          <MultiPick
-            options={skladista.map((s) => ({ id: s.id, label: s.naziv }))}
-            value={fSkladista}
-            onChange={(ids) => setFSkladista(ids as number[])}
-            placeholder="Sva skladišta"
-          />
-        </div>
-        <div style={{ width: 160 }}>
-          <MultiPick
-            options={(subjekti.data ?? [])
-              .filter((s) => redovi.some((r) => r.dobavljacId === s.id))
-              .map((s) => ({ id: s.id, label: s.naziv }))}
-            value={fDobavljaci}
-            onChange={(ids) => setFDobavljaci(ids as number[])}
-            placeholder="Svi dobavljači"
-          />
-        </div>
-        <div style={{ width: 160 }}>
-          <MultiPick
-            options={(kategorije.data ?? [])
-              .filter((k) => redovi.some((r) => r.glavnaKategorijaId === k.id || r.sekundarnaKategorijaId === k.id))
-              .map((k) => ({ id: k.id, label: `${k.code} ${k.name}` }))}
-            value={fKategorije}
-            onChange={(ids) => setFKategorije(ids as number[])}
-            placeholder="Sve kategorije"
-          />
-        </div>
-      </div>
-
-      <div className="tablewrap" style={{ maxHeight: "calc(100vh - 280px)", overflow: "auto" }}>
-        <table className="data">
-          <thead style={{ position: "sticky", top: 0, zIndex: 1 }}>
-            <tr>
-              <th style={{ minWidth: 90 }}>Ident</th>
-              <th style={{ minWidth: 220 }}>Naziv</th>
-              <th>Glavna kat.</th>
-              <th>Sekundarna kat.</th>
-              <th>Serijski</th>
-              {vidljivaSkladista.map((s) => (
-                <th key={`o${s.id}`} style={{ textAlign: "right" }}>
-                  Očekivano {s.naziv}
-                </th>
-              ))}
-              {vidljivaSkladista.map((s) => (
-                <th key={`p${s.id}`} style={{ textAlign: "right" }}>
-                  Popisano {s.naziv}
-                </th>
-              ))}
-              {tab === "popisano" && <th>Datum popisa</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {filtrirani.map((r, ri) => (
-              <tr key={r.articleId}>
-                <td>{r.ident}</td>
-                <td>{r.naziv}</td>
-                <td>{katNaziv(r.glavnaKategorijaId)}</td>
-                <td>{katNaziv(r.sekundarnaKategorijaId)}</td>
-                <td>
-                  {r.serijski && (
-                    <button className="btn" style={{ padding: "0 6px" }} onClick={() => setSerijskiZa(r)}>
-                      Lista
-                    </button>
-                  )}
-                </td>
-                {vidljivaSkladista.map((s) => (
-                  <td key={`o${s.id}`} style={{ textAlign: "right" }}>
-                    {r.poSkladistu.get(s.id)?.ocekivano ?? 0}
-                  </td>
-                ))}
-                {vidljivaSkladista.map((s, si) => (
-                  <td key={`p${s.id}`} style={{ textAlign: "right" }}>
-                    {uToku && tab !== "lista" ? (
-                      <CellPopis
-                        value={vrednost(r, s.id)}
-                        r={ri}
-                        c={si}
-                        onCommit={(v) => upisi(r, s.id, v)}
-                      />
-                    ) : (
-                      (vrednost(r, s.id) ?? "")
-                    )}
-                  </td>
-                ))}
-                {tab === "popisano" && (
-                  <td>
-                    {[...r.poSkladistu.values()]
-                      .map((c) => c.datumPopisa)
-                      .filter((d): d is string => !!d)
-                      .map((d) => new Date(d).toLocaleDateString("sr-RS"))
-                      .filter((v, i, a) => a.indexOf(v) === i)
-                      .join(", ")}
-                  </td>
-                )}
-              </tr>
+      <DataTable
+        tableId="popis-stavke"
+        data={filtrirani}
+        columns={kolone}
+        columnPicker
+        compact
+        leftToolbar={
+          <>
+            {TABOVI.map((tb) => (
+              <button key={tb.id} className={`btn${tab === tb.id ? " primary" : ""}`} onClick={() => setTab(tb.id)}>
+                {tb.label}
+              </button>
             ))}
-            {filtrirani.length === 0 && (
-              <tr>
-                <td colSpan={5 + vidljivaSkladista.length * 2 + (tab === "popisano" ? 1 : 0)} className="subtle">
-                  Nema artikala
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+          </>
+        }
+        toolbar={<FilterDugme defs={filterDefs} opcije={filterOpcije} vrednosti={filteri} onChange={setFilteri} />}
+      />
 
       {serijskiZa && (
         <SerijskiInfoPopup red={serijskiZa} skladista={skladista} onClose={() => setSerijskiZa(null)} />
@@ -647,7 +617,7 @@ function RazlikePopup({
       <div className="popup" style={{ width: 760, maxWidth: "95vw" }}>
         <h2>Obračun razlika među skladištima</h2>
         <div style={{ maxHeight: 380, overflow: "auto", marginBottom: 12 }}>
-          <table className="data">
+          <table className="data stavke">
             <thead>
               <tr>
                 <th>Ident</th>
@@ -865,7 +835,7 @@ function ViskoviPopup({
               <div style={{ flex: 1 }}>
                 <h3 style={{ marginTop: 0 }}>Viškovi (fizički više nego očekivano)</h3>
                 <div style={{ maxHeight: 300, overflow: "auto" }}>
-                  <table className="data">
+                  <table className="data stavke">
                     <thead>
                       <tr>
                         <th>Ident</th>
@@ -929,7 +899,7 @@ function ViskoviPopup({
                       </div>
                     </div>
                     <div style={{ maxHeight: 220, overflow: "auto", marginBottom: 8 }}>
-                      <table className="data">
+                      <table className="data stavke">
                         <thead>
                           <tr>
                             <th>Ident</th>
@@ -978,7 +948,7 @@ function ViskoviPopup({
                     </div>
                     {otpisnoId > 0 && (
                       <div style={{ maxHeight: 180, overflow: "auto", marginTop: 6 }}>
-                        <table className="data">
+                        <table className="data stavke">
                           <tbody>
                             {(otpisani.data ?? [])
                               .filter((a) => (a.stanjePrimarno ?? 0) > 0)

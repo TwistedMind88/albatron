@@ -150,7 +150,7 @@ export function MultiPick({
               top: rect.top,
               left: rect.left,
               minWidth: rect.width,
-              zIndex: 70,
+              zIndex: 200, // iznad .overlay (100) - MultiPick se koristi i u popup wizardima
               background: "var(--surface)",
               border: "1px solid var(--line-strong)",
               borderRadius: "var(--radius)",

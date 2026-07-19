@@ -55,6 +55,7 @@ export function DataTable<T>({
   columnPicker,
   onRowDoubleClick,
   tableId,
+  compact,
 }: {
   data: T[];
   columns: (ColumnDef<T, any> & { defaultVisible?: boolean })[];
@@ -65,6 +66,8 @@ export function DataTable<T>({
   onRowDoubleClick?: (row: T) => void;
   // jedinstven kljuc za pamcenje redosleda/sirina po korisniku
   tableId?: string;
+  // "stavke" gustina - isti padding kao lista stavki u dokumentima
+  compact?: boolean;
 }) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
@@ -171,7 +174,10 @@ export function DataTable<T>({
         {toolbar}
       </div>
       <div className="tablewrap">
-        <table className={resized ? "data fixed" : "data"} style={resized ? { width: table.getTotalSize() } : undefined}>
+        <table
+          className={`data${compact ? " stavke" : ""}${resized ? " fixed" : ""}`}
+          style={resized ? { width: table.getTotalSize() } : undefined}
+        >
           <thead>
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id}>
