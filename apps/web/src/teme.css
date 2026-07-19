@@ -1,0 +1,121 @@
+/* Teme interfejsa (po korisniku, uiPrefs.tema). Podrazumevana tema = :root u styles.css.
+   Klasa se postavlja na <html> (globalno) ili na kontejner (pregled u podesavanjima). */
+
+/* ---------- GRAFIT: moderan svetli, tamni graftini sidebar, safirni akcenat ---------- */
+.tema-grafit {
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --line: #e5e7ec;
+  --line-strong: #c9cdd6;
+  --ink: #16181d;
+  --ink-2: #5c6370;
+  --ink-3: #9aa0ac;
+  --accent: #2e5bff;
+  --accent-ink: #2049db;
+  --accent-soft: #e4eaff;
+  --side-bg: #14161b;
+  --side-ink: #9ba1ac;
+  --side-ink-dim: #6b7280;
+  --side-active: #23262e;
+  --ok: #16a34a;
+  --radius: 8px;
+  --tabbar-bg: #edeff3;
+}
+
+/* ---------- PERGAMENT: svetli klasicni, papirna paleta, bordo akcenat ---------- */
+.tema-pergament {
+  --bg: #faf8f4;
+  --surface: #ffffff;
+  --line: #e7e2d8;
+  --line-strong: #ddd6c8;
+  --ink: #211d17;
+  --ink-2: #6e675c;
+  --ink-3: #8a8375;
+  --accent: #8e2a3c;
+  --accent-ink: #75212f;
+  --accent-soft: #f6edee;
+  --side-bg: #faf8f4;
+  --side-ink: #6e675c;
+  --side-ink-dim: #8a8375;
+  --side-active: #f6edee;
+  --ok: #2f6b4a;
+  --radius: 6px;
+  --tabbar-bg: #f2eee6;
+  --font-ui: Georgia, "Times New Roman", serif;
+}
+/* pergament ima svetli sidebar - tamni tekst i tanke linije umesto belih */
+.tema-pergament .sidebar {
+  border-right: 1px solid var(--line);
+}
+.tema-pergament .brand,
+.tema-pergament .user b,
+.tema-pergament .nav a.active,
+.tema-pergament .nav-flyout a.active {
+  color: var(--accent-ink);
+}
+.tema-pergament .nav a.active,
+.tema-pergament .nav-flyout a.active {
+  background: var(--side-active);
+}
+.tema-pergament .user,
+.tema-pergament .side-collapse-btn,
+.tema-pergament .user button {
+  border-color: var(--line);
+}
+.tema-pergament .user button:hover,
+.tema-pergament .nav a:hover,
+.tema-pergament .nav-ikona:hover,
+.tema-pergament .nav-flyout a:hover {
+  color: var(--ink);
+  background: var(--side-active);
+}
+.tema-pergament .nav-plus:hover {
+  background: var(--line);
+  color: var(--ink);
+}
+.tema-pergament .nav-flyout {
+  border-color: var(--line);
+  box-shadow: 0 4px 12px rgba(33, 29, 23, 0.15);
+}
+
+/* ---------- KOKPIT: tamni tehnicki, tirkizni akcenat ---------- */
+.tema-kokpit {
+  --bg: #0b0f14;
+  --surface: #121924;
+  --line: #1e2936;
+  --line-strong: #28374a;
+  --ink: #e6ebf2;
+  --ink-2: #8b96a5;
+  --ink-3: #5c6878;
+  --accent: #2dd4bf;
+  --accent-ink: #14b8a6;
+  --accent-soft: rgba(45, 212, 191, 0.16);
+  --side-bg: #0e141b;
+  --side-ink: #8b96a5;
+  --side-ink-dim: #5c6878;
+  --side-active: #16202c;
+  --ok: #4ade80;
+  --warn: #f5a623;
+  --danger: #f87171;
+  --radius: 6px;
+  --tabbar-bg: #0e141b;
+}
+/* tamna tema: elementi koji u osnovi racunaju na svetlu pozadinu */
+.tema-kokpit .tab:hover {
+  background: #16202c;
+}
+.tema-kokpit .btn.primary,
+.tema-kokpit .popup .actions .btn.primary {
+  color: #06251f;
+}
+.tema-kokpit .nav a.active,
+.tema-kokpit .nav-flyout a.active,
+.tema-kokpit .user b {
+  color: #e6ebf2;
+}
+.tema-kokpit table.data tbody tr:hover {
+  background: #16202c;
+}
+.tema-kokpit .winbtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}

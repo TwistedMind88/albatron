@@ -4,6 +4,7 @@ import type { SessionUser } from "@albatron/shared";
 import { api, clearApiToken, setOnUnauthorized } from "./api";
 import { Login, PrijavaForma } from "./features/auth/Login";
 import { Shell } from "./shell/Shell";
+import { primeniTemu } from "./teme";
 
 export function App() {
   const [user, setUser] = useState<SessionUser | null>(null);
@@ -17,6 +18,17 @@ export function App() {
       .catch(() => {})
       .finally(() => setChecked(true));
   }, []);
+
+  // Tema po korisniku (uiPrefs.tema); na odjavi se vraca podrazumevana
+  useEffect(() => {
+    if (!user) {
+      primeniTemu(null);
+      return;
+    }
+    api<{ uiPrefs?: { tema?: string } | null }>("/api/moj-profil")
+      .then((p) => primeniTemu(p.uiPrefs?.tema))
+      .catch(() => {});
+  }, [user]);
 
   // Istekla sesija usred rada: popup za ponovnu prijavu preko aplikacije,
   // stanje tabova i formi ostaje netaknuto
