@@ -18,6 +18,7 @@ import { NAV_MODUL, type ModulId, type SessionUser } from "@albatron/shared";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api";
 import { useTabs } from "../store/tabs";
+import { Ikona } from "../components/Ikona";
 import { DEFAULT_GROUPS, type NavGroup } from "./sections";
 
 // ponytail: DnD preuredjuje redosled GRUPA; redosled stavki unutar grupe
@@ -53,6 +54,7 @@ function SortableGroup({ group, activeSection }: { group: NavGroup; activeSectio
       }}
     >
       <span {...attributes} {...listeners}>
+        <Ikona id={group.ikona} size={13} />
         {group.label}
       </span>
       {group.items.map((item) => (
@@ -69,7 +71,10 @@ function SortableGroup({ group, activeSection }: { group: NavGroup; activeSectio
             open(item.id, item.label, { forceNew: true });
           }}
         >
-          {item.label}
+          <span className="nav-l">
+            <Ikona id={item.ikona} />
+            {item.label}
+          </span>
           {item.novi && <PlusNovi item={item} />}
         </a>
       ))}
@@ -152,7 +157,7 @@ function CollapsedGroup({ group, activeSection }: { group: NavGroup; activeSecti
         onMouseEnter={zakazi}
         onMouseLeave={zakaziZatvaranje}
       >
-        {group.ikona}
+        <Ikona id={group.ikona} size={17} />
       </button>
       {flyout &&
         createPortal(
@@ -187,7 +192,10 @@ function CollapsedGroup({ group, activeSection }: { group: NavGroup; activeSecti
                   open(item.id, item.label, { forceNew: true });
                 }}
               >
-                {item.label}
+                <span className="nav-l">
+                  <Ikona id={item.ikona} />
+                  {item.label}
+                </span>
                 {item.novi && <PlusNovi item={item} onOpened={() => setFlyout(null)} />}
               </a>
             ))}

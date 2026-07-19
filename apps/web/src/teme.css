@@ -119,3 +119,77 @@
 .tema-kokpit .winbtn:hover {
   background: rgba(255, 255, 255, 0.08);
 }
+
+/* ---------- dodatna vernost mockupovima (docs/dizajn/redizajn-*.html) ---------- */
+
+/* Grafit: sidebar kao redizajn-1 (hover beli veo, aktivno plavi tint), glow na primarnom dugmetu */
+.tema-grafit .nav a:hover,
+.tema-grafit .nav-ikona:hover,
+.tema-grafit .nav-flyout a:hover,
+.tema-grafit .user button:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+.tema-grafit .nav a.active,
+.tema-grafit .nav-ikona.active,
+.tema-grafit .nav-flyout a.active {
+  background: rgba(46, 91, 255, 0.18);
+  color: #f2f4f8;
+}
+.tema-grafit .btn.primary {
+  box-shadow: 0 3px 10px rgba(46, 91, 255, 0.28);
+}
+.tema-grafit table.data th {
+  background: #fafbfc;
+}
+.tema-grafit table.data td {
+  border-bottom-color: #f0f1f4;
+}
+.tema-grafit table.data tbody tr:hover {
+  background: #f6f8fe;
+}
+.tema-grafit .tab.active,
+.tema-grafit .tab.active::after {
+  background: var(--surface);
+}
+.tema-grafit .card,
+.tema-grafit .tablewrap {
+  box-shadow: 0 1px 2px rgba(22, 24, 29, 0.04);
+}
+
+/* Pergament: editorial detalji */
+.tema-pergament table.data th {
+  background: #faf8f4;
+  letter-spacing: 0.08em;
+}
+.tema-pergament .tab.active,
+.tema-pergament .tab.active::after {
+  background: var(--surface);
+}
+.tema-pergament .btn.primary {
+  box-shadow: none;
+}
+
+/* Kokpit: mono/tabularne cifre i tamna tabela kao redizajn-3 */
+.tema-kokpit table.data {
+  font-variant-numeric: tabular-nums;
+}
+.tema-kokpit table.data th {
+  background: #16202c;
+  color: var(--ink-3);
+}
+.tema-kokpit .btn.primary {
+  box-shadow: 0 0 12px rgba(45, 212, 191, 0.25);
+}
+.tema-kokpit .tab.active,
+.tema-kokpit .tab.active::after {
+  background: var(--surface);
+}
+.tema-kokpit .input:focus {
+  outline-color: rgba(45, 212, 191, 0.3);
+}
+.tema-kokpit .card,
+.tema-kokpit .tablewrap,
+.tema-kokpit .popup,
+.tema-kokpit .login-card {
+  border-color: var(--line);
+}

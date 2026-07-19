@@ -117,7 +117,8 @@ body {
   margin: 0;
 }
 .nav-ikona {
-  display: block;
+  display: grid;
+  place-items: center;
   width: 36px;
   margin: 6px auto 0;
   padding: 6px 0;
@@ -153,7 +154,10 @@ body {
   color: var(--side-ink-dim);
 }
 .nav-flyout a {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   padding: 5px 8px;
   border-radius: var(--radius);
   color: var(--side-ink);
@@ -193,7 +197,9 @@ body {
   margin-top: 10px;
 }
 .nav-group > span {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 0 8px 3px;
   font-size: 10px;
   font-weight: 600;
@@ -201,6 +207,30 @@ body {
   text-transform: uppercase;
   color: var(--side-ink-dim);
   cursor: grab;
+}
+/* SVG ikonice navigacije (faza 16, RP10) */
+.nav-ic {
+  stroke: currentColor;
+  stroke-width: 1.7;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: none;
+}
+.nav-l {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.nav a .nav-ic {
+  color: var(--side-ink-dim);
+}
+.nav a.active .nav-ic,
+.nav-flyout a.active .nav-ic {
+  color: var(--accent);
 }
 .nav a {
   display: flex;

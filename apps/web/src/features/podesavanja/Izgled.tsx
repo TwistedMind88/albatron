@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api";
+import { Ikona } from "../../components/Ikona";
 import { TEME, primeniTemu, type Tema } from "../../teme";
 
 // Izbor teme interfejsa po korisniku (uiPrefs.tema).
@@ -42,20 +43,20 @@ function MockDokument() {
         </div>
         <div className="nav">
           <div className="nav-group">
-            <span>Prodaja</span>
-            <a>Ponude</a>
-            <a className="active">Predračuni</a>
-            <a>Kalkulacije</a>
+            <span><Ikona id="cart" size={13} />Prodaja</span>
+            <a><span className="nav-l"><Ikona id="doc" />Ponude</span></a>
+            <a className="active"><span className="nav-l"><Ikona id="doc-check" />Predračuni</span></a>
+            <a><span className="nav-l"><Ikona id="calc" />Kalkulacije</span></a>
           </div>
           <div className="nav-group">
-            <span>Isporuka</span>
-            <a>Otpremnice</a>
-            <a>Računi</a>
+            <span><Ikona id="truck" size={13} />Isporuka</span>
+            <a><span className="nav-l"><Ikona id="send" />Otpremnice</span></a>
+            <a><span className="nav-l"><Ikona id="receipt" />Računi</span></a>
           </div>
           <div className="nav-group">
-            <span>Šifarnici</span>
-            <a>Klijenti</a>
-            <a>Artikli</a>
+            <span><Ikona id="book" size={13} />Šifarnici</span>
+            <a><span className="nav-l"><Ikona id="users" />Klijenti</span></a>
+            <a><span className="nav-l"><Ikona id="tag" />Artikli</span></a>
           </div>
         </div>
         <div className="user">
