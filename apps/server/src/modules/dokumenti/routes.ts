@@ -5,7 +5,7 @@ import { DOC_MODULI, formatirajBroj, podrazumevaniFormat } from "@albatron/share
 import ExcelJS from "exceljs";
 import { db, schema } from "../../db/index.js";
 import { requireAnyPrivilege, requirePrivilege } from "../auth/guard.js";
-import { getRfqSablon } from "../podesavanja/rfqSablon.js";
+import { getRfqSabloni } from "../podesavanja/rfqSablon.js";
 import { getIstorija, logChanges } from "../artikli/service.js";
 import { knjiziUlaz, upisiEvidencijuPorucenog } from "./nabavka.js";
 import { avansiRacuna, iskoriscenoAvansa, knjiziIzlaz, proveriSerijske, veziAvans } from "./prodaja.js";
@@ -456,19 +456,27 @@ export async function dokumentiRoutes(app: FastifyInstance) {
   // Export upita za dobavljaca po xlsx sablonu (zamenio genericki RFQ iz faze 15):
   // template i sva mapiranja dolaze iz konfiguracije u bazi (vidi rfqSablon.ts),
   // popunjava se samo vrednost postojecih celija pa stilovi/merge ostaju netaknuti
-  app.get("/api/dokumenti/:id/rfq", { preHandler: read }, async (req, reply) => {
-    const cfg = await getRfqSablon();
+  app.get("/api/dokumenti/:id/rfq/:sablonId", { preHandler: read }, async (req, reply) => {
+    const { id: idParam, sablonId } = req.params as { id: string; sablonId: string };
+    const cfg = (await getRfqSabloni()).find((s) => s.id === sablonId);
     if (!cfg) return reply.code(404).send({ error: "Upit po šablonu nije podešen" });
-    const id = Number((req.params as { id: string }).id);
+    const id = Number(idParam);
     const [doc] = await db.select().from(schema.documents).where(eq(schema.documents.id, id));
     if (!doc) return reply.code(404).send({ error: "Dokument ne postoji" });
     if (doc.tip !== "kalkulacija") return reply.code(400).send({ error: "Export upita je dostupan samo na kalkulaciji" });
+    // dobavljac po id-u (novi nacin) ili po nazivu (migrirane konfiguracije)
     const [dobavljac] = await db
       .select({ id: schema.subjects.id })
       .from(schema.subjects)
-      .where(eq(schema.subjects.naziv, cfg.dobavljacNaziv));
+      .where(
+        cfg.dobavljacId !== undefined
+          ? eq(schema.subjects.id, cfg.dobavljacId)
+          : eq(schema.subjects.naziv, cfg.dobavljacNaziv ?? ""),
+      );
     if (!dobavljac) {
-      return reply.code(400).send({ error: `Dobavljač "${cfg.dobavljacNaziv}" ne postoji u šifarniku subjekata` });
+      return reply
+        .code(400)
+        .send({ error: `Dobavljač "${cfg.dobavljacNaziv ?? cfg.label}" ne postoji u šifarniku subjekata` });
     }
     const items = await db
       .select({
@@ -519,7 +527,11 @@ export async function dokumentiRoutes(app: FastifyInstance) {
       }
       const kat = a.glavnaKategorijaId !== null ? kategorijaMap.get(a.glavnaKategorijaId) : undefined;
       const kod = kat?.code ?? null;
-      const sekcija = kod ? cfg.sekcije.find((s) => s.kodPrefiksi.some((p) => kod.startsWith(p))) : undefined;
+      // prvo sekcije sa eksplicitnim prefiksima, pa catch-all (prazan kodPrefiksi);
+      // catch-all prima i stavke bez glavne kategorije
+      const sekcija =
+        (kod ? cfg.sekcije.find((s) => s.kodPrefiksi.some((p) => kod.startsWith(p))) : undefined) ??
+        cfg.sekcije.find((s) => s.kodPrefiksi.length === 0);
       if (!sekcija) {
         problemi.push({
           naziv: i.naziv,

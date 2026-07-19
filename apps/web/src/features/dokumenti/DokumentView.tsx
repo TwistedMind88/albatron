@@ -337,11 +337,11 @@ export function DokumentView({
   });
   const moduli = useQuery({ queryKey: ["moduli"], queryFn: () => api<{ zalihe: boolean }>("/api/moduli") });
 
-  // export upita po sablonu dobavljaca: konfiguracija zivi u bazi (rfqSablon.ts na serveru);
-  // null = nije podeseno, meni nema opciju
-  const rfqSablon = useQuery({
-    queryKey: ["rfq-sablon"],
-    queryFn: () => api<{ label: string; imeFajla: string } | null>("/api/rfq-sablon"),
+  // export upita po sablonu dobavljaca: konfiguracije zive u bazi (rfqSablon.ts na
+  // serveru); svaka konfiguracija = posebno dugme, prazna lista = nema opcija
+  const rfqSabloni = useQuery({
+    queryKey: ["rfq-sabloni"],
+    queryFn: () => api<{ id: string; label: string; imeFajla: string }[]>("/api/rfq-sabloni"),
     enabled: jeKalk,
   });
   // izbor kolona stavki po korisniku i tipu dokumenta (stavka 15)
@@ -710,11 +710,11 @@ export function DokumentView({
   // Export upita po xlsx sablonu dobavljaca (zamenio genericki RFQ iz faze 15):
   // server popunjava template iz konfiguracije i vraca gotov fajl; 400 sa listom
   // problema (pogresan dobavljac, bez SKU, nemapirana kategorija...) ide u popup
-  async function exportRfq() {
+  async function exportRfq(sablon: { id: string; imeFajla: string }) {
     setError("");
     setPoruka("");
     try {
-      const res = await apiFetch(`/api/dokumenti/${savedId}/rfq`);
+      const res = await apiFetch(`/api/dokumenti/${savedId}/rfq/${sablon.id}`);
       if (!res.ok) {
         const data = (await res.json().catch(() => null)) as {
           error?: string;
@@ -727,8 +727,7 @@ export function DokumentView({
         throw new ApiError(res.status, data?.error ?? `Greška ${res.status}`);
       }
       const blob = await res.blob();
-      const prefiks = rfqSablon.data?.imeFajla ?? "upit";
-      await sacuvajFajl(`${prefiks}-${broj.replace(/[^\w-]/g, "_")}.xlsx`, blob);
+      await sacuvajFajl(`${sablon.imeFajla}-${broj.replace(/[^\w-]/g, "_")}.xlsx`, blob);
       setPoruka("Upit exportovan");
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Greška pri exportu upita");
@@ -938,11 +937,12 @@ export function DokumentView({
                   <button className="btn" onClick={kloniraj}>
                     Kloniraj
                   </button>
-                  {jeKalk && rfqSablon.data && (
-                    <button className="btn" onClick={() => void exportRfq()}>
-                      {rfqSablon.data.label}
-                    </button>
-                  )}
+                  {jeKalk &&
+                    rfqSabloni.data?.map((s) => (
+                      <button key={s.id} className="btn" onClick={() => void exportRfq(s)}>
+                        {s.label}
+                      </button>
+                    ))}
                   {cilji.map((c) => (
                     <button key={c.tip} className="btn" onClick={() => setPopup({ vrsta: "generisi", cilj: c.tip })}>
                       {c.label}
