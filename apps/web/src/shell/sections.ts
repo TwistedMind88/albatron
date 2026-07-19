@@ -62,7 +62,11 @@ export const DEFAULT_GROUPS: NavGroup[] = [
     id: "magacin",
     label: "Magacin",
     ikona: "house",
-    items: [{ id: "prenosi", ikona: "arrows", label: "Prenosi" }],
+    items: [
+      { id: "prenosi", ikona: "arrows", label: "Prenosi" },
+      { id: "popisi", ikona: "clip", label: "Popisi" },
+      { id: "presifriranja", ikona: "swap", label: "Prešifriranja" },
+    ],
   },
   {
     id: "pregled",

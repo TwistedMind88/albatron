@@ -504,6 +504,8 @@ export const serialNumbers = pgTable("serial_numbers", {
   refId: integer("ref_id"), // id dokumenta ulaza koji je uneo serijski broj
   // otpremnica koja je skinula broj sa stanja (brief 8.8); null = na stanju
   izlazId: integer("izlaz_id"),
+  // null = izlazId je dokument (otpremnica); 'presifriranje' = izlazId je presifriranja.id
+  izlazVrsta: varchar("izlaz_vrsta", { length: 20 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -523,6 +525,9 @@ export const prenosi = pgTable(
       .references(() => warehouses.id),
     datum: timestamp("datum").notNull(),
     napomena: text("napomena").notNull().default(""),
+    // nacrt (generisan iz popisa, ne knjizi) | knjizen
+    status: varchar("status", { length: 10 }).notNull().default("knjizen"),
+    popisId: integer("popis_id"), // popis iz cijeg je obracuna prenos generisan
     userId: integer("user_id").references(() => users.id),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
@@ -542,6 +547,82 @@ export const prenosStavke = pgTable("prenos_stavke", {
   kolicina: numeric("kolicina", { precision: 14, scale: 2 }).notNull(),
   serijskiBrojevi: jsonb("serijski_brojevi").notNull().default([]), // string[]
   napomena: varchar("napomena", { length: 400 }).notNull().default(""),
+});
+
+// Popis (fizicka inventura): zaglavlje sa kriterijumima izbora artikala
+export const popisi = pgTable(
+  "popisi",
+  {
+    id: serial("id").primaryKey(),
+    godina: integer("godina").notNull(),
+    redniBroj: integer("redni_broj").notNull(),
+    broj: varchar("broj", { length: 30 }).notNull(), // GG-POP-NNNNN
+    datum: timestamp("datum").notNull(),
+    status: varchar("status", { length: 10 }).notNull().default("u_toku"), // u_toku | zakljucen
+    napomena: text("napomena").notNull().default(""),
+    kriterijumi: jsonb("kriterijumi").notNull(), // { skladistaIds, dobavljacIds, kategorijaIds }
+    userId: integer("user_id").references(() => users.id),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("popisi_broj_idx").on(t.godina, t.redniBroj)],
+);
+
+// Stavka popisa = (artikal, skladiste); popisano NULL = nepopisano, 0 = popisana nula
+export const popisStavke = pgTable(
+  "popis_stavke",
+  {
+    id: serial("id").primaryKey(),
+    popisId: integer("popis_id")
+      .notNull()
+      .references(() => popisi.id, { onDelete: "cascade" }),
+    articleId: integer("article_id")
+      .notNull()
+      .references(() => articles.id),
+    warehouseId: integer("warehouse_id")
+      .notNull()
+      .references(() => warehouses.id),
+    ident: varchar("ident", { length: 20 }).notNull().default(""),
+    naziv: varchar("naziv", { length: 400 }).notNull(),
+    ocekivano: numeric("ocekivano", { precision: 14, scale: 2 }).notNull(),
+    popisano: numeric("popisano", { precision: 14, scale: 2 }),
+    datumPopisa: timestamp("datum_popisa"),
+  },
+  (t) => [uniqueIndex("popis_stavke_idx").on(t.popisId, t.articleId, t.warehouseId)],
+);
+
+// Presifriranje: interni dokument koji pretvara jedan artikal u drugi (izlaz A + ulaz B)
+export const presifriranja = pgTable(
+  "presifriranja",
+  {
+    id: serial("id").primaryKey(),
+    godina: integer("godina").notNull(),
+    redniBroj: integer("redni_broj").notNull(),
+    broj: varchar("broj", { length: 30 }).notNull(), // GG-PSF-NNNNN
+    datum: timestamp("datum").notNull(),
+    status: varchar("status", { length: 10 }).notNull().default("nacrt"), // nacrt | knjizen
+    napomena: text("napomena").notNull().default(""),
+    userId: integer("user_id").references(() => users.id),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("presifriranja_broj_idx").on(t.godina, t.redniBroj)],
+);
+
+export const presifriranjeStavke = pgTable("presifriranje_stavke", {
+  id: serial("id").primaryKey(),
+  presifriranjeId: integer("presifriranje_id")
+    .notNull()
+    .references(() => presifriranja.id, { onDelete: "cascade" }),
+  smer: varchar("smer", { length: 5 }).notNull(), // izlaz | ulaz
+  articleId: integer("article_id")
+    .notNull()
+    .references(() => articles.id),
+  warehouseId: integer("warehouse_id")
+    .notNull()
+    .references(() => warehouses.id),
+  ident: varchar("ident", { length: 20 }).notNull().default(""),
+  naziv: varchar("naziv", { length: 400 }).notNull(),
+  kolicina: numeric("kolicina", { precision: 14, scale: 2 }).notNull(),
+  serijskiBrojevi: jsonb("serijski_brojevi").notNull().default([]), // string[]
 });
 
 // --- Projekti (brief 13): grupa dokumenata po klijentu, jedan posao ---

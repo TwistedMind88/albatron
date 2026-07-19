@@ -6,11 +6,13 @@ import { DataTable } from "../../components/DataTable";
 import { ArtikalAutocomplete, type ArtikalOpcija } from "../../components/ArtikalAutocomplete";
 import { IzvestajPopup } from "../dokumenti/IzvestajPopup";
 import type { Skladiste } from "../podesavanja/Moduli";
+import { statusBadge } from "./PopisiPage";
 
 interface PrenosRed {
   id: number;
   broj: string;
   datum: string;
+  status: string;
   izdajno: string;
   prijemno: string;
   napomena: string;
@@ -61,6 +63,7 @@ export function PrenosiPage() {
       header: "Datum",
       cell: ({ getValue }) => new Date(getValue<string>()).toLocaleDateString("sr-RS"),
     },
+    { accessorKey: "status", header: "Status", cell: ({ getValue }) => statusBadge(getValue<string>()) },
     { accessorKey: "izdajno", header: "Izdajno" },
     { accessorKey: "prijemno", header: "Prijemno" },
     { accessorKey: "referent", header: "Referent", cell: ({ getValue }) => getValue<string | null>() ?? "" },
@@ -84,6 +87,7 @@ export function PrenosiPage() {
 interface PrenosDetaljData {
   broj: string;
   datum: string;
+  status: string;
   izdajnoId: number;
   prijemnoId: number;
   napomena: string;
@@ -104,6 +108,8 @@ function PrenosIzmena({ id, onBack }: { id: number; onBack: () => void }) {
     <PrenosForma
       naslov={`Prenos ${q.data.broj}`}
       submitLabel="Sačuvaj"
+      status={q.data.status}
+      nacrtId={q.data.status === "nacrt" ? id : undefined}
       izvestaj={{ id, broj: q.data.broj }}
       initial={{
         izdajnoId: q.data.izdajnoId,
@@ -152,6 +158,8 @@ function PrenosForma({
   submitLabel,
   initial,
   izvestaj,
+  status,
+  nacrtId,
   onSubmit,
   onBack,
 }: {
@@ -160,9 +168,13 @@ function PrenosForma({
   initial?: { izdajnoId: number; prijemnoId: number; datum: string; napomena: string; stavke: Stavka[] };
   // snimljen prenos: dugme Izveštaj otvara IzvestajPopup (faza 16, RP2)
   izvestaj?: { id: number; broj: string };
+  status?: string;
+  // nacrt (generisan iz popisa): serijski opcioni pri snimanju, dugmad Primeni/Obrisi
+  nacrtId?: number;
   onSubmit: (body: PrenosBody) => Promise<void>;
   onBack: () => void;
 }) {
+  const qc = useQueryClient();
   const skladista = useQuery({ queryKey: ["skladista"], queryFn: () => api<Skladiste[]>("/api/skladista") });
   const [izdajnoId, setIzdajnoId] = useState(initial?.izdajnoId ?? 0);
   const [prijemnoId, setPrijemnoId] = useState(initial?.prijemnoId ?? 0);
@@ -216,11 +228,14 @@ function PrenosForma({
   async function snimi() {
     setError("");
     setPoruka("");
-    // artikal koji vodi serijske mora imati tacno kolicina izabranih brojeva
+    // artikal koji vodi serijske mora imati tacno kolicina izabranih brojeva;
+    // nacrt se snima i bez brojeva (biraju se pre primene)
     const losi = new Set<number>();
-    for (let i = 0; i < stavke.length; i++) {
-      const s = stavke[i]!;
-      if (vodiSerijske(s.articleId) && s.serijskiBrojevi.length !== Number(s.kolicina)) losi.add(i);
+    if (!nacrtId) {
+      for (let i = 0; i < stavke.length; i++) {
+        const s = stavke[i]!;
+        if (vodiSerijske(s.articleId) && s.serijskiBrojevi.length !== Number(s.kolicina)) losi.add(i);
+      }
     }
     setLosiRedovi(losi);
     if (losi.size > 0) {
@@ -255,10 +270,48 @@ function PrenosForma({
         ← Nazad
       </button>
       <div className="page-head">
-        <h1>{naslov}</h1>
+        <h1>
+          {naslov} {status && statusBadge(status)}
+        </h1>
         <div className="grow" />
         {error && <span className="login-error">{error}</span>}
         {poruka && <span style={{ fontSize: 12 }}>{poruka}</span>}
+        {nacrtId && (
+          <button
+            className="btn"
+            onClick={async () => {
+              if (!confirm("Obrisati nacrt prenosa?")) return;
+              try {
+                await api(`/api/prenosi/${nacrtId}`, { method: "DELETE" });
+                qc.invalidateQueries({ queryKey: ["prenosi"] });
+                onBack();
+              } catch (e) {
+                setError(e instanceof ApiError ? e.message : "Brisanje nije uspelo");
+              }
+            }}
+          >
+            Obriši
+          </button>
+        )}
+        {nacrtId && (
+          <button
+            className="btn"
+            onClick={async () => {
+              if (!confirm("Primeniti prenos? Knjiži se promet i sele serijski brojevi.")) return;
+              setError("");
+              try {
+                await api(`/api/prenosi/${nacrtId}/primeni`, { method: "POST" });
+                qc.invalidateQueries({ queryKey: ["prenosi"] });
+                qc.invalidateQueries({ queryKey: ["prenos", nacrtId] });
+                onBack();
+              } catch (e) {
+                setError(e instanceof ApiError ? e.message : "Primena nije uspela");
+              }
+            }}
+          >
+            Primeni
+          </button>
+        )}
         {izvestaj && (
           <button className="btn" onClick={() => setIzvPopup(true)}>
             Izveštaj

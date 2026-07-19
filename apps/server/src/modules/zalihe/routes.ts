@@ -120,6 +120,31 @@ async function knjiziPrenosStavke(
   }
 }
 
+// Upis stavki nacrt prenosa (bez knjizenja, bez selidbe serijskih) - koristi se
+// za izmenu nacrta i za generator prenosa iz popisa. Serijski brojevi su opcioni
+// (0..kolicina), kompletiraju se pre primene.
+export async function upisiNacrtStavke(tx: typeof db, prenosId: number, stavke: PrenosStavkaInput[]) {
+  for (const s of stavke) {
+    const [artikal] = await tx
+      .select({ ident: schema.articles.ident, naziv: schema.articles.naziv })
+      .from(schema.articles)
+      .where(eq(schema.articles.id, s.articleId));
+    if (!artikal) throw new Error("Artikal ne postoji");
+    if (s.serijskiBrojevi.length > s.kolicina) {
+      throw new Error("Vise serijskih brojeva nego sto je kolicina stavke");
+    }
+    await tx.insert(schema.prenosStavke).values({
+      prenosId,
+      articleId: s.articleId,
+      ident: artikal.ident,
+      naziv: artikal.naziv,
+      kolicina: s.kolicina.toString(),
+      serijskiBrojevi: s.serijskiBrojevi,
+      napomena: s.napomena,
+    });
+  }
+}
+
 export async function zaliheRoutes(app: FastifyInstance) {
   // --- Moduli (brief 12): admin ukljucuje funkcionalnosti ---
 
@@ -417,6 +442,8 @@ export async function zaliheRoutes(app: FastifyInstance) {
         izdajnoId: schema.prenosi.izdajnoId,
         prijemnoId: schema.prenosi.prijemnoId,
         napomena: schema.prenosi.napomena,
+        status: schema.prenosi.status,
+        popisId: schema.prenosi.popisId,
         referent: schema.users.fullName,
       })
       .from(schema.prenosi)
@@ -466,6 +493,7 @@ export async function zaliheRoutes(app: FastifyInstance) {
             prijemnoId: p.prijemnoId,
             datum,
             napomena: p.napomena,
+            status: "knjizen",
             userId: req.user?.id ?? null,
           })
           .returning();
@@ -496,6 +524,23 @@ export async function zaliheRoutes(app: FastifyInstance) {
     const [stari] = await db.select().from(schema.prenosi).where(eq(schema.prenosi.id, id));
     if (!stari) return reply.code(404).send({ error: "Prenos ne postoji" });
     const datum = new Date(`${p.datum.slice(0, 10)}T12:00:00Z`);
+    // nacrt: bez ledger/serijskih efekata, samo zamena redova (storno bi korumpirao ledger)
+    if (stari.status === "nacrt") {
+      try {
+        await db.transaction(async (tx) => {
+          const txdb = tx as unknown as typeof db;
+          await tx.delete(schema.prenosStavke).where(eq(schema.prenosStavke.prenosId, id));
+          await upisiNacrtStavke(txdb, id, p.stavke);
+          await tx
+            .update(schema.prenosi)
+            .set({ izdajnoId: p.izdajnoId, prijemnoId: p.prijemnoId, datum, napomena: p.napomena })
+            .where(eq(schema.prenosi.id, id));
+        });
+        return { ok: true };
+      } catch (e) {
+        return reply.code(400).send({ error: e instanceof Error ? e.message : "Izmena prenosa nije uspela" });
+      }
+    }
     try {
       await db.transaction(async (tx) => {
         const txdb = tx as unknown as typeof db;
@@ -564,5 +609,50 @@ export async function zaliheRoutes(app: FastifyInstance) {
     } catch (e) {
       return reply.code(400).send({ error: e instanceof Error ? e.message : "Izmena prenosa nije uspela" });
     }
+  });
+
+  // Primena nacrta: knjizi promet i seli serijske; guard update sprecava duplu primenu
+  app.post("/api/prenosi/:id/primeni", { preHandler: write }, async (req, reply) => {
+    const id = Number((req.params as { id: string }).id);
+    try {
+      await db.transaction(async (tx) => {
+        const txdb = tx as unknown as typeof db;
+        const [p] = await tx
+          .update(schema.prenosi)
+          .set({ status: "knjizen" })
+          .where(and(eq(schema.prenosi.id, id), eq(schema.prenosi.status, "nacrt")))
+          .returning();
+        if (!p) throw new Error("Prenos nije nacrt ili ne postoji");
+        const stavke = await tx
+          .select()
+          .from(schema.prenosStavke)
+          .where(eq(schema.prenosStavke.prenosId, id))
+          .orderBy(asc(schema.prenosStavke.id));
+        await tx.delete(schema.prenosStavke).where(eq(schema.prenosStavke.prenosId, id));
+        await knjiziPrenosStavke(
+          txdb,
+          { id, izdajnoId: p.izdajnoId, prijemnoId: p.prijemnoId, datum: p.datum },
+          stavke.map((s) => ({
+            articleId: s.articleId,
+            kolicina: Number(s.kolicina),
+            serijskiBrojevi: (s.serijskiBrojevi ?? []) as string[],
+            napomena: s.napomena,
+          })),
+          req.user?.id ?? null,
+        );
+      });
+      return { ok: true };
+    } catch (e) {
+      return reply.code(400).send({ error: e instanceof Error ? e.message : "Primena prenosa nije uspela" });
+    }
+  });
+
+  app.delete("/api/prenosi/:id", { preHandler: write }, async (req, reply) => {
+    const id = Number((req.params as { id: string }).id);
+    const [p] = await db.select().from(schema.prenosi).where(eq(schema.prenosi.id, id));
+    if (!p) return reply.code(404).send({ error: "Prenos ne postoji" });
+    if (p.status !== "nacrt") return reply.code(400).send({ error: "Samo nacrt prenosa se moze obrisati" });
+    await db.delete(schema.prenosi).where(eq(schema.prenosi.id, id));
+    return { ok: true };
   });
 }

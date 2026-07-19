@@ -9,6 +9,8 @@ import { ArtikliPage } from "../features/artikli/ArtikliPage";
 import { CenovniciPage } from "../features/cenovnici/CenovniciPage";
 import { DokumentiPage } from "../features/dokumenti/DokumentiPage";
 import { PrenosiPage } from "../features/zalihe/PrenosiPage";
+import { PopisiPage } from "../features/zalihe/PopisiPage";
+import { PresifriranjaPage } from "../features/zalihe/PresifriranjaPage";
 import { ObracuniPage, ObracunRezultat } from "../features/obracuni/ObracuniPage";
 import { ProjektiPage } from "../features/projekti/ProjektiPage";
 import { ArtikliImportPage, SubjektiImportPage, UplateImportPage } from "../components/ImportSifarnika";
@@ -33,6 +35,8 @@ const PAGES: Record<string, React.ComponentType<{ payload?: unknown }>> = {
   racuni: ({ payload }) => <DokumentiPage tip="racun" payload={payload} />,
   "avansni-racuni": ({ payload }) => <DokumentiPage tip="avansni_racun" payload={payload} />,
   prenosi: PrenosiPage,
+  popisi: PopisiPage,
+  presifriranja: PresifriranjaPage,
   // import tabovi (faza 15, RP4): skriveni iz sidebara, otvaraju se dugmetom Import
   "artikli-import": ArtikliImportPage,
   "klijenti-import": () => <SubjektiImportPage uloga="klijent" />,

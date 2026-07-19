@@ -60,6 +60,8 @@ export const NAV_MODUL: Record<string, ModulId> = {
   artikli: "artikli",
   cenovnici: "cenovnici",
   prenosi: "zalihe",
+  popisi: "zalihe",
+  presifriranja: "zalihe",
   obracuni: "obracuni",
   uplate: "uplate",
   projekti: "projekti",

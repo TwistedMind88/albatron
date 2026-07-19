@@ -169,6 +169,13 @@
       "when": 1784208962682,
       "tag": "0023_wandering_tyger_tiger",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1784478969074,
+      "tag": "0024_acoustic_magneto",
+      "breakpoints": true
     }
   ]
 }
