@@ -306,6 +306,14 @@ EOF
   chmod +x /etc/cron.daily/albatron-backup
 fi
 
+# ---------- auto-update cron (03:00) ----------
+# skripta sama proverava flag auto_update u bazi (Podesavanja > Automatsko azuriranje)
+info "podesavam automatski update u 03:00 (/etc/cron.d/albatron-update)"
+cat > /etc/cron.d/albatron-update <<EOF
+0 3 * * * root INSTALL_DIR=$INSTALL_DIR /bin/bash $INSTALL_DIR/scripts/update.sh
+EOF
+chmod 644 /etc/cron.d/albatron-update
+
 # ---------- kraj ----------
 sleep 2
 STATUS="$(systemctl is-active "$SERVICE_NAME" || true)"

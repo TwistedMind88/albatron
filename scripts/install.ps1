@@ -278,6 +278,14 @@ if ($Mode -eq "install" -and $FirewallOpen) {
   New-NetFirewallRule -DisplayName "Albatron" -Direction Inbound -Protocol TCP -LocalPort $AppPort -Action Allow | Out-Null
 }
 
+# ---------- auto-update zadatak (03:00) ----------
+# skripta sama proverava flag auto_update u bazi (Podesavanja > Automatsko azuriranje)
+Info "podesavam automatski update u 03:00 (Task Scheduler: AlbatronUpdate)"
+$updateSkripta = Join-Path $InstallDir "scripts\update.ps1"
+schtasks /Create /TN "AlbatronUpdate" /SC DAILY /ST 03:00 /RU SYSTEM /F `
+  /TR "powershell -NoProfile -ExecutionPolicy Bypass -File `"$updateSkripta`"" | Out-Null
+if ($LASTEXITCODE -ne 0) { Warn "kreiranje zadatka AlbatronUpdate nije uspelo - automatski update nece raditi" }
+
 # ---------- kraj ----------
 Start-Sleep -Seconds 2
 $status = (Get-Service $ServiceName -ErrorAction SilentlyContinue).Status

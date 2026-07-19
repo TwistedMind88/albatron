@@ -125,6 +125,7 @@ body {
   background: none;
   border: none;
   border-radius: var(--radius);
+  color: var(--side-ink-dim);
   font-size: 17px;
   cursor: pointer;
   text-align: center;

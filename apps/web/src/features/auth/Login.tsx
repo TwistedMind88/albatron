@@ -87,13 +87,15 @@ export function Login({ onLogin }: { onLogin: (user: SessionUser) => void }) {
         )}
         {jeTauri && info?.version && <DesktopAzuriranje serverVerzija={info.version} />}
         <PrijavaForma onLogin={onLogin} />
-        <a
-          className="subtle"
-          style={{ fontSize: 11, marginTop: 10, textAlign: "center", cursor: "pointer", display: "block" }}
-          onClick={() => setServeri(true)}
-        >
-          Podešavanja servera
-        </a>
+        {jeTauri && (
+          <a
+            className="subtle"
+            style={{ fontSize: 11, marginTop: 10, textAlign: "center", cursor: "pointer", display: "block" }}
+            onClick={() => setServeri(true)}
+          >
+            Podešavanja servera
+          </a>
+        )}
         {!jeTauri && info?.desktopDostupan && (
           <a
             className="subtle"
@@ -104,7 +106,7 @@ export function Login({ onLogin }: { onLogin: (user: SessionUser) => void }) {
           </a>
         )}
       </div>
-      {serveri && <ServerPodesavanja onClose={() => setServeri(false)} />}
+      {jeTauri && serveri && <ServerPodesavanja onClose={() => setServeri(false)} />}
     </div>
   );
 }

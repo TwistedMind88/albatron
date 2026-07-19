@@ -7,7 +7,7 @@ import { join, extname } from "node:path";
 import { randomBytes } from "node:crypto";
 import { pipeline } from "node:stream/promises";
 import { db, schema } from "../../db/index.js";
-import { requirePrivilege } from "../auth/guard.js";
+import { requireAdmin, requirePrivilege } from "../auth/guard.js";
 
 const labeledValue = z.object({ label: z.string(), value: z.string() });
 
@@ -134,6 +134,26 @@ export async function podesavanjaRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: `Slanje nije uspelo: ${(err as Error).message}` });
     }
     return { ok: true };
+  });
+
+  // --- Automatsko azuriranje servera (cron u 3h cita ovaj flag iz baze) ---
+
+  app.get("/api/podesavanja/auto-update", { preHandler: requireAdmin }, async () => {
+    const row = (
+      await db.select().from(schema.appSettings).where(eq(schema.appSettings.key, "auto_update"))
+    )[0];
+    const value = row?.value as { ukljucen?: boolean } | undefined;
+    return { ukljucen: value?.ukljucen ?? true };
+  });
+
+  app.put("/api/podesavanja/auto-update", { preHandler: requireAdmin }, async (req, reply) => {
+    const parsed = z.object({ ukljucen: z.boolean() }).safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: "Neispravan zahtev" });
+    await db
+      .insert(schema.appSettings)
+      .values({ key: "auto_update", value: parsed.data })
+      .onConflictDoUpdate({ target: schema.appSettings.key, set: { value: parsed.data } });
+    return parsed.data;
   });
 
   // --- Uputstva (PDF dokumenti, faza 16 RP8) ---
