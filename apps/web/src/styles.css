@@ -208,7 +208,9 @@ body {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--side-ink-dim);
-  cursor: grab;
+  /* klik = collapse/expand grupe, prevlacenje = promena redosleda */
+  cursor: pointer;
+  user-select: none;
 }
 /* SVG ikonice navigacije (faza 16, RP10) */
 .nav-ic {
@@ -238,7 +240,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 5px 8px;
+  /* tree uvlacenje stavki u odnosu na naslov grupe (po redizajn mockupu) */
+  margin: 1px 0 1px 13px;
+  padding: 5px 8px 5px 12px;
   border-radius: var(--radius);
   color: var(--side-ink);
   text-decoration: none;
@@ -249,7 +253,7 @@ body {
 .nav a:hover {
   background: var(--side-active);
 }
-/* "+" za nov dokument, uvek vidljiv na stavkama tipa dokumenta (faza 16, st. 46) */
+/* "+" za nov dokument na stavkama tipa dokumenta - vidljiv samo na hover reda */
 .nav-plus {
   border: none;
   background: transparent;
@@ -260,6 +264,12 @@ body {
   border-radius: 3px;
   cursor: pointer;
   flex: none;
+  opacity: 0;
+}
+.nav a:hover .nav-plus,
+.nav-flyout a:hover .nav-plus,
+.nav-plus:focus-visible {
+  opacity: 1;
 }
 .nav-plus:hover {
   background: rgba(255, 255, 255, 0.15);

@@ -6,6 +6,7 @@ import { KorisniciPage } from "../korisnici/KorisniciPage";
 import { ProfilFirme } from "./ProfilFirme";
 import { MojProfil } from "./MojProfil";
 import { Izgled } from "./Izgled";
+import { MeniEditor } from "./MeniEditor";
 import { Liste } from "./Liste";
 import { PodrazumevaniIzbori } from "./PodrazumevaniIzbori";
 import { Kategorije } from "./Kategorije";
@@ -22,6 +23,7 @@ const SECTIONS: { id: string; label: string; el: ComponentType; adminOnly?: bool
   { id: "profil-firme", label: "Profil firme", el: ProfilFirme },
   { id: "profil", label: "Profil", el: MojProfil },
   { id: "izgled", label: "Izgled (tema)", el: Izgled },
+  { id: "meni", label: "Levi meni", el: MeniEditor },
   { id: "liste", label: "Liste predefinisanih izbora", el: Liste },
   { id: "podrazumevani", label: "Podrazumevani izbori", el: PodrazumevaniIzbori },
   { id: "kategorije", label: "Kategorije artikala", el: Kategorije },
