@@ -79,6 +79,7 @@ export async function podesavanjaRoutes(app: FastifyInstance) {
         smtp: schema.users.smtp,
         sidebarLayout: schema.users.sidebarLayout,
         uiPrefs: schema.users.uiPrefs,
+        dashboardLayout: schema.users.dashboardLayout,
       })
       .from(schema.users)
       .where(eq(schema.users.id, req.user.id));
@@ -93,6 +94,7 @@ export async function podesavanjaRoutes(app: FastifyInstance) {
         smtp: smtpSchema.nullable().optional(),
         sidebarLayout: z.unknown().optional(),
         uiPrefs: z.unknown().optional(),
+        dashboardLayout: z.unknown().optional(),
       })
       .safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: "Neispravan zahtev" });
@@ -106,6 +108,7 @@ export async function podesavanjaRoutes(app: FastifyInstance) {
         smtp: schema.users.smtp,
         sidebarLayout: schema.users.sidebarLayout,
         uiPrefs: schema.users.uiPrefs,
+        dashboardLayout: schema.users.dashboardLayout,
       });
     return updated;
   });

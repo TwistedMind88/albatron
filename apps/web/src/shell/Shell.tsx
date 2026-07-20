@@ -16,6 +16,8 @@ import { ProjektiPage } from "../features/projekti/ProjektiPage";
 import { ArtikliImportPage, SubjektiImportPage, UplateImportPage } from "../components/ImportSifarnika";
 import { UplatePage } from "../features/uplate/UplatePage";
 import { ZadaciPage } from "../features/zadaci/ZadaciPage";
+import { DashboardPage } from "../features/dashboard/DashboardPage";
+import { useEffect } from "react";
 
 // Registar stranica po sekciji - puni se kroz faze
 const PAGES: Record<string, React.ComponentType<{ payload?: unknown }>> = {
@@ -48,6 +50,7 @@ const PAGES: Record<string, React.ComponentType<{ payload?: unknown }>> = {
   "obracun-rezultat": ObracunRezultat,
   projekti: ProjektiPage,
   zadaci: ZadaciPage,
+  pocetna: DashboardPage,
 };
 
 function TabContent({ sectionId, title, payload }: { sectionId: string; title: string; payload?: unknown }) {
@@ -63,6 +66,11 @@ function TabContent({ sectionId, title, payload }: { sectionId: string; title: s
 export function Shell({ user, onLogout }: { user: SessionUser; onLogout: () => void }) {
   const tabs = useTabs((s) => s.tabs);
   const activeId = useTabs((s) => s.activeId);
+
+  // Dashboard je landing: prva prijava otvara "Početna" umesto praznog placeholdera (plan 20, faza 4)
+  useEffect(() => {
+    if (useTabs.getState().tabs.length === 0) useTabs.getState().open("pocetna", "Početna");
+  }, []);
 
   return (
     <div className="app">

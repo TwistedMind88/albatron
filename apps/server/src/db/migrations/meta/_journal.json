@@ -190,6 +190,13 @@
       "when": 1784544897600,
       "tag": "0026_bizarre_firebird",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1784561964698,
+      "tag": "0027_silly_praxagora",
+      "breakpoints": true
     }
   ]
 }

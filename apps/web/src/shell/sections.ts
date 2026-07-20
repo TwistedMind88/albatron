@@ -73,6 +73,8 @@ export const DEFAULT_GROUPS: NavGroup[] = [
     label: "Pregled",
     ikona: "chart",
     items: [
+      // van NAV_MODUL - uvek vidljiva; dashboard landing (plan 20, faza 4)
+      { id: "pocetna", ikona: "house", label: "Početna" },
       { id: "obracuni", ikona: "pie", label: "Obračuni" },
       { id: "uplate", ikona: "card", label: "Uplate" },
       { id: "projekti", ikona: "folder", label: "Projekti" },

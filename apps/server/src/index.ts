@@ -26,6 +26,7 @@ import { uplateRoutes } from "./modules/uplate/routes.js";
 import { projektiRoutes } from "./modules/projekti/routes.js";
 import { zadaciRoutes } from "./modules/zadaci/routes.js";
 import { obavestenjaRoutes } from "./modules/obavestenja/routes.js";
+import { dashboardRoutes } from "./modules/dashboard/routes.js";
 import { downloadRoutes } from "./modules/download/routes.js";
 import { cleanExpiredSessions, cleanOldAuditLog } from "./modules/auth/service.js";
 
@@ -69,6 +70,7 @@ await app.register(uplateRoutes);
 await app.register(projektiRoutes);
 await app.register(zadaciRoutes);
 await app.register(obavestenjaRoutes);
+await app.register(dashboardRoutes);
 await app.register(downloadRoutes);
 
 app.get("/api/health", async () => ({ ok: true }));

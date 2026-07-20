@@ -16,6 +16,20 @@ export const TIP_INFO: Record<string, { label: string; mnozina: string }> = {
 // Nabavni dokumenti idu prema dobavljacu, sa nabavnim cenama (brief 8.5)
 export const NABAVNI_TIPOVI = ["porudzbina", "priprema_uvoza", "ulaz_robe"];
 
+// tip dokumenta -> id sekcije (kljuc u Shell PAGES / sidebar). Za otvaranje iz obavestenja i dashboarda.
+export const TIP_SEKCIJA: Record<string, string> = {
+  ponuda: "ponude",
+  predracun: "predracuni",
+  revers: "reversi",
+  kalkulacija: "kalkulacije",
+  otpremnica: "otpremnice",
+  racun: "racuni",
+  avansni_racun: "avansni-racuni",
+  porudzbina: "porudzbine",
+  priprema_uvoza: "priprema-za-uvoz",
+  ulaz_robe: "ulaz-robe",
+};
+
 // Filteri u pregledu dokumenata (faza 15, RP6.1): konfiguracija po tipu.
 // Nove kolone u buducnosti se dodaju ovde (jedno mesto).
 export interface FilterDef {

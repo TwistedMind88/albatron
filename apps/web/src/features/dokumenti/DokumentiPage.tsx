@@ -22,9 +22,13 @@ interface Red {
 
 export function DokumentiPage({ tip, payload }: { tip: string; payload?: unknown }) {
   // payload { novi: true } iz sidebara "+": tab se otvara direktno na novom dokumentu (faza 16, st. 46)
-  const [openId, setOpenId] = useState<number | "nov" | null>(
-    payload && typeof payload === "object" && (payload as { novi?: boolean }).novi ? "nov" : null,
-  );
+  // payload { openId } iz obavestenja/dashboarda: tab se otvara direktno na tom dokumentu
+  const [openId, setOpenId] = useState<number | "nov" | null>(() => {
+    const p = payload && typeof payload === "object" ? (payload as { novi?: boolean; openId?: number }) : null;
+    if (p?.novi) return "nov";
+    if (typeof p?.openId === "number") return p.openId;
+    return null;
+  });
   const [filteri, setFilteri] = useState<FilterVrednosti>({});
   const [fTekst, setFTekst] = useState("");
 

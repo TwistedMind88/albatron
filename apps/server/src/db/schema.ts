@@ -32,6 +32,8 @@ export const users = pgTable("users", {
   sidebarLayout: jsonb("sidebar_layout"),
   // genericke UI preference po korisniku (faza 14.4, stavka 15): { stavkeKolone: { [tip]: { hidden: string[] } } }
   uiPrefs: jsonb("ui_prefs"),
+  // raspored dashboarda po korisniku (plan 20, faza 4): { widgets: [{ id, tip, config? }] }
+  dashboardLayout: jsonb("dashboard_layout"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

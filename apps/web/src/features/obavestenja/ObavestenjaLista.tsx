@@ -1,20 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api";
 import { useTabs } from "../../store/tabs";
-
-// tip dokumenta -> sidebar sekcija (za otvaranje iz obavestenja)
-const TIP_SEKCIJA: Record<string, string> = {
-  ponuda: "ponude",
-  predracun: "predracuni",
-  revers: "reversi",
-  kalkulacija: "kalkulacije",
-  otpremnica: "otpremnice",
-  racun: "racuni",
-  avansni_racun: "avansni-racuni",
-  porudzbina: "porudzbine",
-  priprema_uvoza: "priprema-za-uvoz",
-  ulaz_robe: "ulaz-robe",
-};
+import { TIP_SEKCIJA } from "../dokumenti/common";
 
 export interface Obavestenje {
   id: number;
