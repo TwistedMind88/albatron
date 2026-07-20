@@ -204,6 +204,9 @@ export function dostupneKolone(tip: string): { id: string; label: string }[] {
     );
   }
   if (tip === "ponuda" || tip === "predracun") k.push({ id: "rok", label: "Rok isporuke" });
+  // izracunate kolone prenosa (faza 3), read-only
+  if (tip === "predracun") k.push({ id: "otpremljeno", label: "Otpremljeno" });
+  if (tip === "otpremnica") k.push({ id: "fakturisano", label: "Fakturisano" });
   if (tip === "ponuda") k.push({ id: "opcioni", label: "Opc." });
   if (tip === "revers") k.push({ id: "serijskiBroj", label: "Serijski broj" });
   if (tip === "priprema_uvoza" || tip === "ulaz_robe") {
@@ -464,6 +467,11 @@ export function StavkeTabela({
             <CellText value={s.rokIsporuke} onCommit={(v) => onIzmena(idx, { rokIsporuke: v })} {...dataAttrs()} />
           </td>
         );
+      // izracunato pri citanju (faza 3), read-only
+      case "otpremljeno":
+        return <td key={id} style={{ textAlign: "right", whiteSpace: "nowrap" }}>{fmt(r2(s.otpremljeno ?? 0))}</td>;
+      case "fakturisano":
+        return <td key={id} style={{ textAlign: "right", whiteSpace: "nowrap" }}>{fmt(r2(s.fakturisano ?? 0))}</td>;
       case "opcioni":
         return (
           <td key={id}>

@@ -75,6 +75,11 @@ export interface Stavka {
   serijskiBrojevi: string[] | null;
   // prenos 1:1 (brief 8.9) - vodi server, klijent vraca nepromenjeno
   prenetaKolicina: number;
+  // atribucija po stavci (faza 3) - server je postavlja, klijent vraca nepromenjeno
+  izvorStavkaId?: number | null;
+  // izracunato pri citanju (faza 3), read-only: Otpremljeno na predracunu / Fakturisano na otpremnici
+  otpremljeno?: number;
+  fakturisano?: number;
 }
 
 export const PRAZNA_STAVKA: Stavka = {
@@ -99,6 +104,7 @@ export const PRAZNA_STAVKA: Stavka = {
   koleta: null,
   serijskiBrojevi: null,
   prenetaKolicina: 0,
+  izvorStavkaId: null,
 };
 
 export const KALK_TROSKOVI = [

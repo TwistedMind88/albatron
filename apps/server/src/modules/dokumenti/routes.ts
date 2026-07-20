@@ -9,6 +9,7 @@ import { getRfqSabloni } from "../podesavanja/rfqSablon.js";
 import { getIstorija, logChanges } from "../artikli/service.js";
 import { knjiziUlaz, upisiEvidencijuPorucenog } from "./nabavka.js";
 import { avansiRacuna, iskoriscenoAvansa, knjiziIzlaz, proveriSerijske, veziAvans } from "./prodaja.js";
+import { obavesti, obavestiPretplatnike } from "../obavestenja/service.js";
 
 const read = requireAnyPrivilege(DOC_MODULI, "read");
 const write = requireAnyPrivilege(DOC_MODULI, "write");
@@ -88,6 +89,8 @@ const itemSchema = z.object({
   serijskiBrojevi: z.array(z.string().min(1)).nullable().default(null),
   // prenos 1:1 (brief 8.9) - server ga vodi, klijent ga vraca nepromenjenog
   prenetaKolicina: z.number().default(0),
+  // atribucija po stavci (faza 3) - server je postavlja pri generisanju, klijent vraca nepromenjeno
+  izvorStavkaId: z.number().nullable().default(null),
 });
 
 const headerSchema = z.object({
@@ -220,6 +223,41 @@ async function vezaniDokumenti(id: number) {
   }));
 }
 
+// Faza 3 + 2: kad se promeni kolicina stavke koja ima izvor (otpremnica->predracun,
+// racun->otpremnica), obavesti referenta izvornog dokumenta o promeni kolone
+// Otpremljeno/Fakturisano. `izvorIds` = id-jevi izvornih stavki kojima se promenio zbir.
+async function obavestiIzvorne(izvorIds: number[], akterId: number | null, ciljBroj: string) {
+  if (izvorIds.length === 0) return;
+  const izvori = await db
+    .select({
+      docId: schema.documents.id,
+      referentId: schema.documents.referentId,
+      tip: schema.documents.tip,
+      broj: schema.documents.broj,
+    })
+    .from(schema.documentItems)
+    .innerJoin(schema.documents, eq(schema.documentItems.documentId, schema.documents.id))
+    .where(inArray(schema.documentItems.id, izvorIds));
+  // grupisi po izvornom dokumentu (jedno obavestenje po dokumentu)
+  const poDokumentu = new Map<number, { docId: number; referentId: number; broj: string; tip: string }>();
+  for (const iz of izvori) {
+    if (iz.referentId === null || iz.referentId === akterId) continue;
+    poDokumentu.set(iz.docId, { docId: iz.docId, referentId: iz.referentId, broj: iz.broj, tip: iz.tip });
+  }
+  for (const d of poDokumentu.values()) {
+    const kolona = d.tip === "predracun" ? "Otpremljeno" : "Fakturisano";
+    await obavesti(db, {
+      userIds: [d.referentId],
+      tip: "dokument_stavka",
+      naslov: `Promena kolone ${kolona} na dokumentu ${d.broj}`,
+      tekst: `Izmena kolicine u dokumentu ${ciljBroj} promenila je ${kolona} na ${d.broj}.`,
+      linkTip: "dokument",
+      linkId: d.docId,
+      osim: akterId ?? undefined,
+    });
+  }
+}
+
 export async function dokumentiRoutes(app: FastifyInstance) {
   await ensureStatusi();
 
@@ -295,6 +333,12 @@ export async function dokumentiRoutes(app: FastifyInstance) {
         if (tip === "racun") await proveriSerijske(txdb, items);
         return d;
       });
+      // obavesti pretplatnike na kreiranje ovog tipa dokumenta (faza 2)
+      await obavestiPretplatnike(
+        db,
+        { tip: "dokument_kreiran", dokumentTip: tip, osim: req.user?.id },
+        { naslov: `Nov dokument: ${doc.broj}`, tekst: `Kreiran ${tip} ${doc.broj}.`, linkTip: "dokument", linkId: doc.id },
+      );
       return reply.code(201).send(doc);
     } catch (e) {
       return reply.code(400).send({ error: e instanceof Error ? e.message : "Greška pri snimanju" });
@@ -314,13 +358,40 @@ export async function dokumentiRoutes(app: FastifyInstance) {
       .from(schema.documentItems)
       .where(eq(schema.documentItems.documentId, id))
       .orderBy(asc(schema.documentItems.pozicija));
+
+    // Otpremljeno (predracun) / Fakturisano (otpremnica): zbir kolicine na
+    // ciljnim stavkama koje pokazuju na ovu stavku (izvorStavkaId), racunato pri
+    // citanju - naknadne izmene ciljnog dokumenta su automatski tacne (faza 3).
+    // ponytail: prazno/0 za stare stavke bez izvora dok se ne desi NOV prenos posle migracije.
+    const ciljTip = doc!.tip === "predracun" ? "otpremnica" : doc!.tip === "otpremnica" ? "racun" : null;
+    const kolonaKljuc = doc!.tip === "predracun" ? "otpremljeno" : "fakturisano";
+    let itemsOut: (typeof items[number] & { otpremljeno?: number; fakturisano?: number })[] = items;
+    if (ciljTip && items.length) {
+      const preneto = await db
+        .select({
+          izvorStavkaId: schema.documentItems.izvorStavkaId,
+          zbir: sql<number>`coalesce(sum(${schema.documentItems.kolicina}), 0)::float`,
+        })
+        .from(schema.documentItems)
+        .innerJoin(schema.documents, eq(schema.documentItems.documentId, schema.documents.id))
+        .where(
+          and(
+            inArray(schema.documentItems.izvorStavkaId, items.map((i) => i.id)),
+            eq(schema.documents.tip, ciljTip),
+          ),
+        )
+        .groupBy(schema.documentItems.izvorStavkaId);
+      const m = new Map(preneto.map((p) => [p.izvorStavkaId, p.zbir]));
+      itemsOut = items.map((i) => ({ ...i, [kolonaKljuc]: m.get(i.id) ?? 0 }));
+    }
+
     const [referent] = doc!.referentId
       ? await db.select({ fullName: schema.users.fullName }).from(schema.users).where(eq(schema.users.id, doc!.referentId))
       : [];
     // finansije avansa (brief 8.10): na racunu iskorisceni avansi, na avansu preostalo
     const avansi = doc!.tip === "racun" ? await avansiRacuna(db, id) : null;
     const avansIskorisceno = doc!.tip === "avansni_racun" ? await iskoriscenoAvansa(db, id) : null;
-    return { ...doc, referent: referent?.fullName ?? "", items, veze: await vezaniDokumenti(id), avansi, avansIskorisceno };
+    return { ...doc, referent: referent?.fullName ?? "", items: itemsOut, veze: await vezaniDokumenti(id), avansi, avansIskorisceno };
   });
 
   // Zakljucavanje dokumenta pri uredjivanju (faza 17, RP11):
@@ -374,6 +445,11 @@ export async function dokumentiRoutes(app: FastifyInstance) {
     const parsed = headerSchema.extend({ items: z.array(itemSchema).default([]) }).safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues[0]?.message });
     const { items, ...header } = parsed.data;
+    // zbir kolicine po izvornoj stavci pre izmene (faza 3: promena Otpremljeno/Fakturisano)
+    const preIzvor = await db
+      .select({ izvorStavkaId: schema.documentItems.izvorStavkaId, kolicina: schema.documentItems.kolicina })
+      .from(schema.documentItems)
+      .where(and(eq(schema.documentItems.documentId, id), isNotNull(schema.documentItems.izvorStavkaId)));
     try {
       const after = await db.transaction(async (tx) => {
         const txdb = tx as unknown as typeof db;
@@ -400,6 +476,35 @@ export async function dokumentiRoutes(app: FastifyInstance) {
       const { lockedBy: _lb, lockHeartbeat: _lh, ...beforeLog } = before;
       const { lockedBy: _la, lockHeartbeat: _lha, ...afterLog } = after;
       await logChanges("dokument", id, beforeLog, afterLog, req.user?.id ?? null);
+
+      // obavesti referenta dokumenta o promeni statusa (faza 2)
+      if (before.status !== after.status && before.referentId && before.referentId !== req.user?.id) {
+        await obavesti(db, {
+          userIds: [before.referentId],
+          tip: "dokument_status",
+          naslov: `Promena statusa: ${after.broj}`,
+          tekst: `Status dokumenta ${after.broj}: "${before.status}" -> "${after.status}".`,
+          linkTip: "dokument",
+          linkId: id,
+          osim: req.user?.id ?? undefined,
+        });
+      }
+
+      // obavesti referente izvornih dokumenata o promeni kolicine linkovanih stavki (faza 3)
+      const postIzvor = await db
+        .select({ izvorStavkaId: schema.documentItems.izvorStavkaId, kolicina: schema.documentItems.kolicina })
+        .from(schema.documentItems)
+        .where(and(eq(schema.documentItems.documentId, id), isNotNull(schema.documentItems.izvorStavkaId)));
+      const zbir = (rows: { izvorStavkaId: number | null; kolicina: string }[]) => {
+        const m = new Map<number, number>();
+        for (const r of rows) if (r.izvorStavkaId !== null) m.set(r.izvorStavkaId, (m.get(r.izvorStavkaId) ?? 0) + Number(r.kolicina));
+        return m;
+      };
+      const pre = zbir(preIzvor);
+      const post = zbir(postIzvor);
+      const izmenjeni = [...new Set([...pre.keys(), ...post.keys()])].filter((k) => (pre.get(k) ?? 0) !== (post.get(k) ?? 0));
+      await obavestiIzvorne(izmenjeni, req.user?.id ?? null, after.broj);
+
       return after;
     } catch (e) {
       return reply.code(400).send({ error: e instanceof Error ? e.message : "Greška pri snimanju" });
@@ -721,18 +826,22 @@ export async function dokumentiRoutes(app: FastifyInstance) {
 
         if (izabrane.length && !jeAvansCilj) {
           await tx.insert(schema.documentItems).values(
-            izabrane.map(({ id: _ii, documentId: _d, vracenaKolicina: _v, opcioni: _o, prenetaKolicina: _p, ...it }, idx) => {
-              const k = prenos.get(_ii)!;
-              return {
-                ...it,
-                // serijski brojevi se nasledjuju samo pri prenosu pune kolicine (brief 8.9)
-                serijskiBrojevi: k === Number(it.kolicina) ? it.serijskiBrojevi : null,
-                kolicina: k.toString(),
-                opcioni: false,
-                documentId: d.id,
-                pozicija: pozicijaOd + idx + 1,
-              };
-            }),
+            izabrane.map(
+              ({ id: _ii, documentId: _d, vracenaKolicina: _v, opcioni: _o, prenetaKolicina: _p, izvorStavkaId: _isi, ...it }, idx) => {
+                const k = prenos.get(_ii)!;
+                return {
+                  ...it,
+                  // serijski brojevi se nasledjuju samo pri prenosu pune kolicine (brief 8.9)
+                  serijskiBrojevi: k === Number(it.kolicina) ? it.serijskiBrojevi : null,
+                  kolicina: k.toString(),
+                  opcioni: false,
+                  documentId: d.id,
+                  pozicija: pozicijaOd + idx + 1,
+                  // atribucija po stavci (faza 3): nova stavka pamti tacnu izvornu stavku
+                  izvorStavkaId: _ii,
+                };
+              },
+            ),
           );
         }
         const [postojecaVeza] = await tx
@@ -807,6 +916,19 @@ export async function dokumentiRoutes(app: FastifyInstance) {
         }
         return d;
       });
+      // generisi zaobilazi PUT diff (menja prenetaKolicina/status izvora); obavesti
+      // referenta izvornog dokumenta kad je akter neko drugi (faza 2 + 3)
+      if (src.referentId && src.referentId !== req.user?.id) {
+        await obavesti(db, {
+          userIds: [src.referentId],
+          tip: "dokument_stavka",
+          naslov: `Prenos iz ${src.broj} u ${doc.broj}`,
+          tekst: `Iz dokumenta ${src.broj} generisan je ${tip} ${doc.broj}.`,
+          linkTip: "dokument",
+          linkId: src.id,
+          osim: req.user?.id ?? undefined,
+        });
+      }
       return reply.code(201).send(doc);
     } catch (e) {
       return reply.code(400).send({ error: e instanceof Error ? e.message : "Greška pri generisanju" });

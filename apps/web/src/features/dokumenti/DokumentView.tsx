@@ -433,6 +433,9 @@ export function DokumentView({
         koleta: n(i.koleta),
         serijskiBrojevi: (i.serijskiBrojevi ?? null) as string[] | null,
         prenetaKolicina: Number(i.prenetaKolicina ?? 0),
+        izvorStavkaId: (i.izvorStavkaId ?? null) as number | null,
+        otpremljeno: i.otpremljeno !== undefined ? Number(i.otpremljeno) : undefined,
+        fakturisano: i.fakturisano !== undefined ? Number(i.fakturisano) : undefined,
       })),
     );
     if (doc.klijentId) void ucitajKontakte(doc.klijentId as number);
