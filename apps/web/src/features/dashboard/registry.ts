@@ -2,6 +2,8 @@ import type { ComponentType } from "react";
 import { DokumentiListaWidget, DokumentiListaConfig } from "./widgets/DokumentiListaWidget";
 import { MojiDokumentiWidget } from "./widgets/MojiDokumentiWidget";
 import { PreciceWidget, PreciceConfig } from "./widgets/PreciceWidget";
+import { ZadaciWidget } from "./widgets/ZadaciWidget";
+import { ObavestenjaWidget, ObavestenjaConfig } from "./widgets/ObavestenjaWidget";
 
 export interface WidgetProps {
   config: Record<string, unknown>;
@@ -39,6 +41,19 @@ export const WIDGETS: WidgetDef[] = [
     Component: PreciceWidget,
     Config: PreciceConfig,
     defaultConfig: { items: [] },
+  },
+  {
+    tip: "zadaci",
+    label: "Moji zadaci",
+    Component: ZadaciWidget,
+    defaultConfig: {},
+  },
+  {
+    tip: "obavestenja",
+    label: "Obaveštenja",
+    Component: ObavestenjaWidget,
+    Config: ObavestenjaConfig,
+    defaultConfig: { prikaziPretplate: true },
   },
 ];
 
