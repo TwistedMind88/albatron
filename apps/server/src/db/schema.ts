@@ -10,6 +10,7 @@ import {
   timestamp,
   uniqueIndex,
   varchar,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
 export const roles = pgTable("roles", {
@@ -348,6 +349,11 @@ export const documentItems = pgTable("document_items", {
   serijskiBrojevi: jsonb("serijski_brojevi"),
   // pravilo prenosa 1:1 (brief 8.9): kolicina preneta na sledeci dokument u lancu
   prenetaKolicina: numeric("preneta_kolicina", { precision: 14, scale: 2 }).notNull().default("0"),
+  // atribucija po stavci (plan 20, faza 3): iz koje je izvorne stavke ova nastala,
+  // za kolone Otpremljeno/Fakturisano racunate pri citanju
+  izvorStavkaId: integer("izvor_stavka_id").references((): AnyPgColumn => documentItems.id, {
+    onDelete: "set null",
+  }),
 });
 
 // Evidencija porucenog po predracunu (brief 8.5) - trajna, sprecava dupliranje u obracunima
@@ -688,6 +694,88 @@ export const uplate = pgTable("uplate", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+// Zadaci (plan 20, faza 1): trajna todo lista, opciono vezana za subjekat/dokument,
+// sa modelom pozivnica za saradnju vise korisnika.
+export const zadaci = pgTable("zadaci", {
+  id: serial("id").primaryKey(),
+  naziv: varchar("naziv", { length: 300 }).notNull(),
+  opis: text("opis").notNull().default(""),
+  subjektId: integer("subjekt_id").references(() => subjects.id),
+  dokumentId: integer("dokument_id").references(() => documents.id, { onDelete: "set null" }),
+  rok: timestamp("rok"),
+  prioritet: varchar("prioritet", { length: 10 }).notNull().default("srednji"), // nizak|srednji|visok
+  status: varchar("status", { length: 10 }).notNull().default("aktivan"), // aktivan|zavrsen
+  kreiraoId: integer("kreirao_id")
+    .notNull()
+    .references(() => users.id),
+  zavrsioId: integer("zavrsio_id").references(() => users.id),
+  zavrsenoAt: timestamp("zavrseno_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Izvrsioci zadatka: biranje korisnika = pozivnica (status pozvan), pozvani
+// prihvata/odbija; samopridruzivanje ostavlja pozvaoId prazan (odmah prihvatio).
+export const zadatakIzvrsioci = pgTable(
+  "zadatak_izvrsioci",
+  {
+    id: serial("id").primaryKey(),
+    zadatakId: integer("zadatak_id")
+      .notNull()
+      .references(() => zadaci.id, { onDelete: "cascade" }),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id),
+    status: varchar("status", { length: 10 }).notNull().default("pozvan"), // pozvan|prihvatio|odbio
+    pozvaoId: integer("pozvao_id").references(() => users.id), // null = samopridruzivanje
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    respondedAt: timestamp("responded_at"),
+  },
+  (t) => [uniqueIndex("zadatak_izvrsilac_uniq").on(t.zadatakId, t.userId)],
+);
+
+// Hronologija opisa (append-only): glavni opis je izmenjiv, "dodaj opis" pise ovde.
+export const zadatakOpisi = pgTable("zadatak_opisi", {
+  id: serial("id").primaryKey(),
+  zadatakId: integer("zadatak_id")
+    .notNull()
+    .references(() => zadaci.id, { onDelete: "cascade" }),
+  tekst: text("tekst").notNull(),
+  autorId: integer("autor_id")
+    .notNull()
+    .references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Obavestenja (plan 20, faza 2): inbox po korisniku, polling (bez websocketa).
+export const obavestenja = pgTable("obavestenja", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }), // primalac
+  tip: varchar("tip", { length: 30 }).notNull(), // dokument_kreiran|dokument_status|dokument_stavka|zadatak_poziv|zadatak_dogadjaj
+  naslov: varchar("naslov", { length: 300 }).notNull(),
+  tekst: text("tekst").notNull().default(""),
+  linkTip: varchar("link_tip", { length: 20 }), // 'dokument' | 'zadatak'
+  linkId: integer("link_id"),
+  procitano: boolean("procitano").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Pretplate na kategorije obavestenja (npr. kreiranje dokumenta odredjenog tipa).
+export const obavestenjaPretplate = pgTable(
+  "obavestenja_pretplate",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tip: varchar("tip", { length: 30 }).notNull(), // npr. 'dokument_kreiran'
+    dokumentTip: varchar("dokument_tip", { length: 20 }).notNull().default(""), // opcioni filter, '' = svi
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("obavestenja_pretplata_uniq").on(t.userId, t.tip, t.dokumentTip)],
+);
 
 // Generalna podesavanja kao key-value (npr. podrazumevani izbori za dokumente)
 export const appSettings = pgTable("app_settings", {

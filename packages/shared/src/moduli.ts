@@ -20,6 +20,7 @@ export const MODULES = [
   { id: "obracuni", label: "Obračuni", zavisi: [] },
   { id: "uplate", label: "Uplate", zavisi: ["klijenti"] },
   { id: "projekti", label: "Projekti", zavisi: [] },
+  { id: "zadaci", label: "Zadaci", zavisi: [] },
   { id: "korisnici", label: "Korisnici", zavisi: [] },
   { id: "podesavanja", label: "Podešavanja", zavisi: [] },
 ] as const;
@@ -65,6 +66,7 @@ export const NAV_MODUL: Record<string, ModulId> = {
   obracuni: "obracuni",
   uplate: "uplate",
   projekti: "projekti",
+  zadaci: "zadaci",
   korisnici: "korisnici",
   podesavanja: "podesavanja",
 };

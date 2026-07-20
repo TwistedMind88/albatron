@@ -176,6 +176,20 @@
       "when": 1784478969074,
       "tag": "0024_acoustic_magneto",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1784542270945,
+      "tag": "0025_massive_ozymandias",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1784544897600,
+      "tag": "0026_bizarre_firebird",
+      "breakpoints": true
     }
   ]
 }

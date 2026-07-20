@@ -68,19 +68,19 @@ const defaultRole: { name: string; priv: [string, "read" | "write"][] }[] = [
     name: "Komercijala",
     priv: [
       ["klijenti", "write"], ["dobavljaci", "write"], ...dokumentiSvi("write"), ["obracuni", "write"], ["projekti", "write"],
-      ["artikli", "read"], ["cenovnici", "read"], ["zalihe", "read"], ["podesavanja", "read"],
+      ["artikli", "read"], ["cenovnici", "read"], ["zalihe", "read"], ["podesavanja", "read"], ["zadaci", "write"],
     ],
   },
   {
     name: "Nabavka",
     priv: [
       ["artikli", "write"], ["cenovnici", "write"], ...dokumentiSvi("write"), ["zalihe", "write"],
-      ["klijenti", "read"], ["dobavljaci", "read"], ["obracuni", "read"], ["podesavanja", "read"],
+      ["klijenti", "read"], ["dobavljaci", "read"], ["obracuni", "read"], ["podesavanja", "read"], ["zadaci", "write"],
     ],
   },
   {
     name: "Magacin",
-    priv: [["zalihe", "write"], ...dokumentiSvi("read"), ["artikli", "read"]],
+    priv: [["zalihe", "write"], ...dokumentiSvi("read"), ["artikli", "read"], ["zadaci", "write"]],
   },
 ];
 

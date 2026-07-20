@@ -76,6 +76,7 @@ export const DEFAULT_GROUPS: NavGroup[] = [
       { id: "obracuni", ikona: "pie", label: "Obračuni" },
       { id: "uplate", ikona: "card", label: "Uplate" },
       { id: "projekti", ikona: "folder", label: "Projekti" },
+      { id: "zadaci", ikona: "doc-check", label: "Zadaci" },
       { id: "podesavanja", ikona: "gear", label: "Podešavanja" },
     ],
   },

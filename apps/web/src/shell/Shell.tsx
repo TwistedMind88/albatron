@@ -15,6 +15,7 @@ import { ObracuniPage, ObracunRezultat } from "../features/obracuni/ObracuniPage
 import { ProjektiPage } from "../features/projekti/ProjektiPage";
 import { ArtikliImportPage, SubjektiImportPage, UplateImportPage } from "../components/ImportSifarnika";
 import { UplatePage } from "../features/uplate/UplatePage";
+import { ZadaciPage } from "../features/zadaci/ZadaciPage";
 
 // Registar stranica po sekciji - puni se kroz faze
 const PAGES: Record<string, React.ComponentType<{ payload?: unknown }>> = {
@@ -46,6 +47,7 @@ const PAGES: Record<string, React.ComponentType<{ payload?: unknown }>> = {
   "uplate-import": UplateImportPage,
   "obracun-rezultat": ObracunRezultat,
   projekti: ProjektiPage,
+  zadaci: ZadaciPage,
 };
 
 function TabContent({ sectionId, title, payload }: { sectionId: string; title: string; payload?: unknown }) {
