@@ -19,6 +19,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../api";
 import { useTabs } from "../store/tabs";
 import { Ikona } from "../components/Ikona";
+import { ObavestenjaZvonce } from "../features/obavestenja/ObavestenjaZvonce";
 import type { NavItem } from "./sections";
 import {
   LAYOUT_EVENT,
@@ -369,6 +370,9 @@ export function Sidebar({ user, onLogout }: { user: SessionUser; onLogout: () =>
           </DndContext>
         )}
       </nav>
+      <div className="obav-bar" style={{ padding: collapsed ? "6px 0" : "6px 10px", display: "flex", justifyContent: collapsed ? "center" : "flex-start" }}>
+        <ObavestenjaZvonce collapsed={collapsed} />
+      </div>
       <div className="user">
         {!collapsed && (
           <>
