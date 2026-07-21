@@ -144,7 +144,9 @@ export async function dashboardRoutes(app: FastifyInstance) {
       });
       if (!res.ok) throw new Error("http " + res.status);
       const html = await res.text();
-      const m = html.match(/EUR\s+([\d.,]+)[\s\S]*?USD\s+([\d.,]+)[\s\S]*?GBP\s+([\d.,]+)/);
+      // Gadget je HTML sa tagovima izmedju valute i broja - skini tagove pa parsiraj.
+      const tekst = html.replace(/<[^>]+>/g, " ").replace(/&nbsp;/gi, " ");
+      const m = tekst.match(/EUR\s+([\d.,]+)[\s\S]*?USD\s+([\d.,]+)[\s\S]*?GBP\s+([\d.,]+)/);
       if (!m) throw new Error("format");
       const broj = (s: string) => Number(s.replace(",", "."));
       const data: KursRezultat = {
