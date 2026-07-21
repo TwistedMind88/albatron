@@ -8,6 +8,7 @@ import { randomBytes } from "node:crypto";
 import { pipeline } from "node:stream/promises";
 import { db, schema } from "../../db/index.js";
 import { requireAdmin, requirePrivilege } from "../auth/guard.js";
+import { imapKlijent } from "../dashboard/imap.js";
 
 const labeledValue = z.object({ label: z.string(), value: z.string() });
 
@@ -32,6 +33,16 @@ const smtpSchema = z.object({
   // mail prozor (brief 7.8): BCC kopija i default body template sa {placeholder} poljima
   bcc: z.string().default(""),
   bodyTemplate: z.string().default(""),
+});
+
+// IMAP citanje pošte po korisniku (plan 20, faza 7) - ogledalo smtp kolone.
+const imapSchema = z.object({
+  host: z.string(),
+  port: z.number(),
+  secure: z.boolean(),
+  user: z.string(),
+  pass: z.string(),
+  folder: z.string().default("INBOX"),
 });
 
 export async function podesavanjaRoutes(app: FastifyInstance) {
@@ -77,6 +88,7 @@ export async function podesavanjaRoutes(app: FastifyInstance) {
         username: schema.users.username,
         fullName: schema.users.fullName,
         smtp: schema.users.smtp,
+        imap: schema.users.imap,
         sidebarLayout: schema.users.sidebarLayout,
         uiPrefs: schema.users.uiPrefs,
         dashboardLayout: schema.users.dashboardLayout,
@@ -92,6 +104,7 @@ export async function podesavanjaRoutes(app: FastifyInstance) {
       .object({
         fullName: z.string().min(1).optional(),
         smtp: smtpSchema.nullable().optional(),
+        imap: imapSchema.nullable().optional(),
         sidebarLayout: z.unknown().optional(),
         uiPrefs: z.unknown().optional(),
         dashboardLayout: z.unknown().optional(),
@@ -106,6 +119,7 @@ export async function podesavanjaRoutes(app: FastifyInstance) {
         id: schema.users.id,
         fullName: schema.users.fullName,
         smtp: schema.users.smtp,
+        imap: schema.users.imap,
         sidebarLayout: schema.users.sidebarLayout,
         uiPrefs: schema.users.uiPrefs,
         dashboardLayout: schema.users.dashboardLayout,
@@ -135,6 +149,22 @@ export async function podesavanjaRoutes(app: FastifyInstance) {
       });
     } catch (err) {
       return reply.code(400).send({ error: `Slanje nije uspelo: ${(err as Error).message}` });
+    }
+    return { ok: true };
+  });
+
+  // Test IMAP podesavanja: konekcija + prijava dokazuju kredencijale (plan 20, faza 7)
+  app.post("/api/moj-profil/imap-test", async (req, reply) => {
+    if (!req.user) return reply.code(401).send({ error: "Niste prijavljeni" });
+    const parsed = imapSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: "Neispravan zahtev" });
+    const client = imapKlijent(parsed.data);
+    try {
+      await client.connect();
+    } catch (err) {
+      return reply.code(400).send({ error: `Prijava nije uspela: ${(err as Error).message}` });
+    } finally {
+      await client.logout().catch(() => {});
     }
     return { ok: true };
   });
