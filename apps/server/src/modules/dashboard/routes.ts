@@ -1,7 +1,53 @@
 import type { FastifyInstance } from "fastify";
 import { and, desc, eq } from "drizzle-orm";
 import Parser from "rss-parser";
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
 import { db, schema } from "../../db/index.js";
+
+// --- SSRF zastita za korisnicki zadat RSS URL ---
+// Blokira privatne/loopback/link-local/reserved adrese: bez ovoga bi prijavljen
+// korisnik mogao naterati server da dohvati internu adresu (metadata, localhost, LAN).
+function jePrivatanIpv4(ip: string): boolean {
+  const o = ip.split(".").map(Number);
+  if (o.length !== 4 || o.some((n) => Number.isNaN(n) || n < 0 || n > 255)) return true;
+  const [a, b] = o as [number, number, number, number];
+  if (a === 0 || a === 10 || a === 127) return true;
+  if (a === 169 && b === 254) return true; // link-local
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT
+  if (a >= 224) return true; // multicast + reserved
+  return false;
+}
+
+export function jePrivatanIp(ip: string): boolean {
+  const v = isIP(ip);
+  if (v === 4) return jePrivatanIpv4(ip);
+  if (v === 6) {
+    const low = ip.toLowerCase();
+    if (low === "::1" || low === "::") return true;
+    const mapped = low.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+    if (mapped) return jePrivatanIpv4(mapped[1]!);
+    if (/^fe[89ab]/.test(low)) return true; // link-local fe80::/10
+    if (/^f[cd]/.test(low)) return true; // ULA fc00::/7
+    if (/^ff/.test(low)) return true; // multicast
+    return false;
+  }
+  return true; // nije validan IP = blokiraj
+}
+
+// ponytail: DNS se razresava ovde pa fetch ponovo razresava (TOCTOU/rebinding
+// rezidual); prihvatljivo za LAN alat. Pinovati razreseni IP tek ako zatreba.
+async function siguranHost(host: string): Promise<boolean> {
+  if (isIP(host)) return !jePrivatanIp(host);
+  try {
+    const adrese = await lookup(host, { all: true });
+    return adrese.length > 0 && adrese.every((a) => !jePrivatanIp(a.address));
+  } catch {
+    return false;
+  }
+}
 
 // Dashboard agregati (plan 20, faza 4). Licni podaci - gejtovani samo attachUser-om.
 export async function dashboardRoutes(app: FastifyInstance) {
@@ -33,13 +79,38 @@ export async function dashboardRoutes(app: FastifyInstance) {
   app.get<{ Querystring: { url?: string } }>("/api/dashboard/rss", async (req, reply) => {
     if (!req.user) return reply.code(401).send({ error: "Niste prijavljeni" });
     const url = req.query.url;
-    if (!url || !/^https?:\/\//i.test(url)) return reply.code(400).send({ error: "Neispravan URL" });
+    if (!url) return reply.code(400).send({ error: "Neispravan URL" });
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      return reply.code(400).send({ error: "Neispravan URL" });
+    }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return reply.code(400).send({ error: "Neispravan URL" });
+    }
+    if (!(await siguranHost(parsed.hostname))) {
+      return reply.code(400).send({ error: "Nedozvoljen host" });
+    }
 
     const kesirano = rssKes.get(url);
     if (kesirano && Date.now() - kesirano.fetchedAt < RSS_TTL) return kesirano.data;
 
     try {
-      const feed = await rssParser.parseURL(url);
+      // Sopstveni fetch (ne rssParser.parseURL) da bismo zabranili redirekt -
+      // redirekt na internu adresu zaobisao bi siguranHost proveru.
+      const res = await fetch(parsed, {
+        redirect: "manual",
+        headers: { "User-Agent": "Mozilla/5.0 (Albatron dashboard)" },
+        signal: AbortSignal.timeout(10000),
+      });
+      if (res.status >= 300 && res.status < 400) throw new Error("redirect");
+      if (!res.ok) throw new Error("http " + res.status);
+      const buf = await res.arrayBuffer();
+      // ponytail: kap posle preuzimanja (timeout ogranicava trajanje); streaming
+      // limit tek ako download-bomba postane problem.
+      if (buf.byteLength > 2 * 1024 * 1024) throw new Error("prevelik");
+      const feed = await rssParser.parseString(new TextDecoder().decode(buf));
       const data: RssRezultat = {
         title: feed.title ?? url,
         items: (feed.items ?? []).slice(0, 15).map((i) => ({
