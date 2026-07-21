@@ -18,6 +18,8 @@ export interface WidgetDef {
   Component: ComponentType<WidgetProps>;
   Config?: ComponentType<WidgetConfigProps>;
   defaultConfig: Record<string, unknown>;
+  // Pocetne dimenzije u jedinicama mreze (12 kolona). Obavestenja su siri/visi.
+  defaultSize?: { w: number; h: number };
 }
 
 // Registar widgeta - raste inkrementalno kroz faze (plan 20).
@@ -28,12 +30,14 @@ export const WIDGETS: WidgetDef[] = [
     Component: DokumentiListaWidget,
     Config: DokumentiListaConfig,
     defaultConfig: { tip: "predracun", limit: 5 },
+    defaultSize: { w: 4, h: 6 },
   },
   {
     tip: "moji-dokumenti",
     label: "Moji dokumenti u izradi",
     Component: MojiDokumentiWidget,
     defaultConfig: {},
+    defaultSize: { w: 4, h: 6 },
   },
   {
     tip: "precice",
@@ -41,12 +45,14 @@ export const WIDGETS: WidgetDef[] = [
     Component: PreciceWidget,
     Config: PreciceConfig,
     defaultConfig: { items: [] },
+    defaultSize: { w: 4, h: 5 },
   },
   {
     tip: "zadaci",
     label: "Moji zadaci",
     Component: ZadaciWidget,
     defaultConfig: {},
+    defaultSize: { w: 6, h: 7 },
   },
   {
     tip: "obavestenja",
@@ -54,6 +60,7 @@ export const WIDGETS: WidgetDef[] = [
     Component: ObavestenjaWidget,
     Config: ObavestenjaConfig,
     defaultConfig: { prikaziPretplate: true },
+    defaultSize: { w: 6, h: 9 },
   },
 ];
 

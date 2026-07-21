@@ -26,6 +26,7 @@
     "@tauri-apps/plugin-fs": "^2.5.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
+    "react-grid-layout": "^2.2.3",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zustand": "^5.0.14"
   },
