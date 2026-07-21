@@ -6,6 +6,7 @@ import { ZadaciWidget } from "./widgets/ZadaciWidget";
 import { ObavestenjaWidget, ObavestenjaConfig } from "./widgets/ObavestenjaWidget";
 import { RssWidget, RssConfig } from "./widgets/RssWidget";
 import { KursnaListaWidget } from "./widgets/KursnaListaWidget";
+import { ImapWidget, ImapConfig } from "./widgets/ImapWidget";
 
 export interface WidgetProps {
   config: Record<string, unknown>;
@@ -78,6 +79,14 @@ export const WIDGETS: WidgetDef[] = [
     Component: KursnaListaWidget,
     defaultConfig: {},
     defaultSize: { w: 3, h: 4 },
+  },
+  {
+    tip: "imap",
+    label: "Pošta (IMAP)",
+    Component: ImapWidget,
+    Config: ImapConfig,
+    defaultConfig: { folder: "INBOX" },
+    defaultSize: { w: 5, h: 8 },
   },
 ];
 

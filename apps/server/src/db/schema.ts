@@ -28,6 +28,8 @@ export const users = pgTable("users", {
   roleId: integer("role_id").references(() => roles.id),
   // SMTP podesavanja po korisniku (brief 10): host, port, secure, user, pass, fromName, fromEmail
   smtp: jsonb("smtp"),
+  // IMAP podesavanja po korisniku (plan 20, faza 7): { host, port, secure, user, pass, folder? } - ogledalo smtp kolone
+  imap: jsonb("imap"),
   // raspored sidebara po korisniku (brief 3.1)
   sidebarLayout: jsonb("sidebar_layout"),
   // genericke UI preference po korisniku (faza 14.4, stavka 15): { stavkeKolone: { [tip]: { hidden: string[] } } }
