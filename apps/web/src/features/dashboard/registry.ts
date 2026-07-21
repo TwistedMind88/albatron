@@ -4,6 +4,8 @@ import { MojiDokumentiWidget } from "./widgets/MojiDokumentiWidget";
 import { PreciceWidget, PreciceConfig } from "./widgets/PreciceWidget";
 import { ZadaciWidget } from "./widgets/ZadaciWidget";
 import { ObavestenjaWidget, ObavestenjaConfig } from "./widgets/ObavestenjaWidget";
+import { RssWidget, RssConfig } from "./widgets/RssWidget";
+import { KursnaListaWidget } from "./widgets/KursnaListaWidget";
 
 export interface WidgetProps {
   config: Record<string, unknown>;
@@ -61,6 +63,21 @@ export const WIDGETS: WidgetDef[] = [
     Config: ObavestenjaConfig,
     defaultConfig: { prikaziPretplate: true },
     defaultSize: { w: 6, h: 9 },
+  },
+  {
+    tip: "rss",
+    label: "RSS vesti",
+    Component: RssWidget,
+    Config: RssConfig,
+    defaultConfig: { urls: [] },
+    defaultSize: { w: 4, h: 7 },
+  },
+  {
+    tip: "kursna-lista",
+    label: "Kursna lista",
+    Component: KursnaListaWidget,
+    defaultConfig: {},
+    defaultSize: { w: 3, h: 4 },
   },
 ];
 
