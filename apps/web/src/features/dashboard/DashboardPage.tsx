@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import GridLayout, { useContainerWidth, type Layout } from "react-grid-layout";
+import GridLayout, { WidthProvider, type Layout } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
+import "react-resizable/css/styles.css";
 import { api } from "../../api";
 import { Ikona } from "../../components/Ikona";
 import { WIDGETS, widgetDef } from "./registry";
 
+const Grid = WidthProvider(GridLayout);
 const COLS = 12;
 const ROW_H = 40;
 
@@ -62,7 +64,6 @@ export function DashboardPage() {
   const [picker, setPicker] = useState(false);
   const [configOpen, setConfigOpen] = useState<string | null>(null);
   const timer = useRef<number | undefined>(undefined);
-  const { width, containerRef, mounted } = useContainerWidth();
 
   useEffect(() => {
     api<{ dashboardLayout: unknown }>("/api/moj-profil")
@@ -81,12 +82,12 @@ export function DashboardPage() {
     }, 500);
   }
 
-  const layout = useMemo<Layout>(
+  const layout = useMemo<Layout[]>(
     () => widgets.map((w) => ({ i: w.id, x: w.x, y: w.y, w: w.w, h: w.h, minW: 2, minH: 3 })),
     [widgets],
   );
 
-  function onLayoutChange(next: Layout) {
+  function onLayoutChange(next: Layout[]) {
     const poId = new Map(next.map((l) => [l.i, l]));
     let promena = false;
     const merged = widgets.map((w) => {
@@ -124,18 +125,21 @@ export function DashboardPage() {
         <div className="placeholder">Dashboard je prazan. Dodajte vidžet dugmetom gore desno.</div>
       )}
 
-      <div ref={containerRef}>
-        {mounted && (
-          <GridLayout
-            className="layout"
-            layout={layout}
-            width={width}
-            gridConfig={{ cols: COLS, rowHeight: ROW_H, margin: [12, 12] }}
-            dragConfig={{ enabled: true, handle: ".wdg-drag", bounded: false }}
-            resizeConfig={{ enabled: true, handles: ["se"] }}
-            onLayoutChange={onLayoutChange}
-          >
-            {widgets.map((w) => {
+      <Grid
+        className="layout"
+        layout={layout}
+        cols={COLS}
+        rowHeight={ROW_H}
+        margin={[12, 12]}
+        draggableHandle=".wdg-drag"
+        draggableCancel="button"
+        isDraggable
+        isResizable
+        resizeHandles={["se"]}
+        compactType="vertical"
+        onLayoutChange={onLayoutChange}
+      >
+        {widgets.map((w) => {
           const def = widgetDef(w.tip);
           if (!def) return null;
           const Body = def.Component;
@@ -194,11 +198,9 @@ export function DashboardPage() {
                 <Body config={w.config} />
               </div>
             </div>
-              );
-            })}
-          </GridLayout>
-        )}
-      </div>
+          );
+        })}
+      </Grid>
 
       {picker && (
         <div className="overlay" onClick={() => setPicker(false)}>
