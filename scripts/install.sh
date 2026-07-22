@@ -94,8 +94,8 @@ need_pkg=""
 for p in git curl openssl ca-certificates; do
   command -v "$p" >/dev/null || need_pkg="$need_pkg $p"
 done
-# smbclient (SMB push) i mount.nfs (NFS) za mrezni backup
-command -v smbclient >/dev/null || need_pkg="$need_pkg smbclient"
+# mount.cifs (SMB) i mount.nfs (NFS) za mrezni backup
+command -v mount.cifs >/dev/null || need_pkg="$need_pkg cifs-utils"
 command -v mount.nfs >/dev/null || need_pkg="$need_pkg nfs-common"
 if [ -n "$need_pkg" ]; then
   info "instaliram:$need_pkg"

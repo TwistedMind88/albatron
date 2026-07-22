@@ -72,15 +72,22 @@ fi
 find "$LOKALNI" -maxdepth 1 -type f -name '*.gz' -mtime "+${CUVAJ:-14}" -delete || true
 
 # ---------- mrezni cilj ----------
+# SMB i NFS se oba montiraju pa se kopira obican cp - bez smbclient -c string
+# konkatenacije (injection) i bez lozinke u argv (vidljiva kroz ps). Za SMB
+# kredencijali idu u privremeni fajl (chmod 600), obrisan trap-om.
 push_smb() {
-  # smbclient - userspace, bez mounta; kredencijali samo za ovu komandu
-  command -v smbclient >/dev/null || { echo "GRESKA: smbclient nije instaliran"; return 1; }
-  local podfolder="${M_FOLDER:-}"
-  local cmd=""
-  [ -n "$podfolder" ] && cmd="mkdir \"$podfolder\"; cd \"$podfolder\"; "
-  cmd+="put \"$DB_FILE\" \"$(basename "$DB_FILE")\""
-  [ -n "$ST_FILE" ] && cmd+="; put \"$ST_FILE\" \"$(basename "$ST_FILE")\""
-  smbclient "//$M_SERVER/$M_DEO" -U "$M_USER%$M_PASS" -c "$cmd"
+  command -v mount.cifs >/dev/null || { echo "GRESKA: cifs-utils (mount.cifs) nije instaliran"; return 1; }
+  local mnt cred
+  mnt="$(mktemp -d)"
+  cred="$(mktemp)"
+  chmod 600 "$cred"
+  printf 'username=%s\npassword=%s\n' "$M_USER" "$M_PASS" > "$cred"
+  trap 'umount "$mnt" 2>/dev/null || true; rmdir "$mnt" 2>/dev/null || true; rm -f "$cred"' RETURN
+  mount -t cifs "//$M_SERVER/$M_DEO" "$mnt" -o "credentials=$cred"
+  local cilj="$mnt/${M_FOLDER:-}"
+  mkdir -p "$cilj"
+  cp "$DB_FILE" "$cilj/"
+  [ -n "$ST_FILE" ] && cp "$ST_FILE" "$cilj/"
 }
 
 push_nfs() {
