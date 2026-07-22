@@ -17,8 +17,8 @@
 
   /* sidebar */
   --side-bg: #16263f;
-  --side-ink: #c4cfde;
-  --side-ink-dim: #7e8ba0;
+  --side-ink: #e4eaf4;
+  --side-ink-dim: #9aa7bc;
   --side-active: #223a5e;
 
   /* statusi */
@@ -71,11 +71,13 @@ body {
 .app {
   display: grid;
   grid-template-columns: auto 1fr;
+  /* levi meni i desni sadrzaj skroluju nezavisno - app se nikad ne skroluje ceo */
+  overflow: hidden;
 }
 
 /* ===================== SIDEBAR ===================== */
 .sidebar {
-  width: 184px;
+  width: 210px;
   background: var(--side-bg);
   color: var(--side-ink);
   display: flex;
@@ -183,6 +185,10 @@ body {
   font-weight: 600;
   color: #fff;
   letter-spacing: 0.02em;
+  cursor: pointer;
+}
+.brand:hover small {
+  color: var(--side-ink);
 }
 .brand small {
   display: block;
@@ -315,6 +321,9 @@ body {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  /* drzi kolonu na visini grida; skroluje se .content unutra, ne ceo layout */
+  min-height: 0;
+  overflow: hidden;
 }
 .tabbar {
   display: flex;

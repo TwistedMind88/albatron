@@ -175,16 +175,56 @@ export async function podesavanjaRoutes(app: FastifyInstance) {
     const row = (
       await db.select().from(schema.appSettings).where(eq(schema.appSettings.key, "auto_update"))
     )[0];
-    const value = row?.value as { ukljucen?: boolean } | undefined;
-    return { ukljucen: value?.ukljucen ?? true };
+    const value = row?.value as { ukljucen?: boolean; sat?: number } | undefined;
+    return { ukljucen: value?.ukljucen ?? true, sat: value?.sat ?? 3 };
   });
 
   app.put("/api/podesavanja/auto-update", { preHandler: requireAdmin }, async (req, reply) => {
-    const parsed = z.object({ ukljucen: z.boolean() }).safeParse(req.body);
+    // sat = cas u danu (0-23) kada cron pokrece update; cron radi na svaki pun sat
+    const parsed = z
+      .object({ ukljucen: z.boolean(), sat: z.number().int().min(0).max(23).default(3) })
+      .safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: "Neispravan zahtev" });
     await db
       .insert(schema.appSettings)
       .values({ key: "auto_update", value: parsed.data })
+      .onConflictDoUpdate({ target: schema.appSettings.key, set: { value: parsed.data } });
+    return parsed.data;
+  });
+
+  // --- Rezervne kopije (backup baze + storage; cron cita ovu konfiguraciju) ---
+  // Mrezni cilj (SMB/NFS) je opcion; lozinka se cuva kao i SMTP/IMAP - u bazi (LAN alat).
+
+  const backupSchema = z.object({
+    ukljucen: z.boolean().default(true),
+    sat: z.number().int().min(0).max(23).default(3),
+    cuvajDana: z.number().int().min(1).max(365).default(14),
+    lokalniDir: z.string().default("/var/backups/albatron"),
+    mreza: z
+      .object({
+        tip: z.enum(["", "smb", "nfs"]).default(""),
+        server: z.string().default(""),
+        deo: z.string().default(""),
+        folder: z.string().default(""),
+        korisnik: z.string().default(""),
+        lozinka: z.string().default(""),
+      })
+      .default({ tip: "", server: "", deo: "", folder: "", korisnik: "", lozinka: "" }),
+  });
+
+  app.get("/api/podesavanja/backup", { preHandler: requireAdmin }, async () => {
+    const row = (
+      await db.select().from(schema.appSettings).where(eq(schema.appSettings.key, "backup"))
+    )[0];
+    return backupSchema.parse(row?.value ?? {});
+  });
+
+  app.put("/api/podesavanja/backup", { preHandler: requireAdmin }, async (req, reply) => {
+    const parsed = backupSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: "Neispravan zahtev" });
+    await db
+      .insert(schema.appSettings)
+      .values({ key: "backup", value: parsed.data })
       .onConflictDoUpdate({ target: schema.appSettings.key, set: { value: parsed.data } });
     return parsed.data;
   });

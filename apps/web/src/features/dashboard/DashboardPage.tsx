@@ -148,7 +148,7 @@ export function DashboardPage() {
                 flexDirection: "column",
                 border: "1px solid var(--line)",
                 borderRadius: 6,
-                background: "var(--panel, transparent)",
+                background: "var(--surface)",
                 overflow: "hidden",
               }}
             >

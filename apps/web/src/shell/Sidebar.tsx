@@ -265,6 +265,7 @@ export function Sidebar({ user, onLogout }: { user: SessionUser; onLogout: () =>
   const tabs = useTabs((s) => s.tabs);
   const activeId = useTabs((s) => s.activeId);
   const activeSection = tabs.find((t) => t.id === activeId)?.sectionId ?? null;
+  const openTab = useTabs((s) => s.open);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
   const moduli = useQuery({ queryKey: ["moduli"], queryFn: () => api<Record<ModulId, boolean>>("/api/moduli") });
   // klik na naslov grupe posle DnD prevlacenja ne sme da toggluje collapse
@@ -327,7 +328,7 @@ export function Sidebar({ user, onLogout }: { user: SessionUser; onLogout: () =>
 
   return (
     <aside className={"sidebar" + (collapsed ? " collapsed" : "")}>
-      <div className="brand">
+      <div className="brand" title="Početna" onClick={() => openTab("pocetna", "Početna")}>
         {collapsed ? "A" : (
           <>
             Albatron

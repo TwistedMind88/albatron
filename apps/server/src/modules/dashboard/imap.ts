@@ -39,6 +39,7 @@ async function korisnikovImap(userId: number): Promise<ImapCfg | null> {
 }
 
 interface Poruka {
+  folder: string;
   uid: number;
   from: string;
   subject: string;
@@ -58,7 +59,8 @@ export function imapRoutes(app: FastifyInstance) {
     try {
       await client.connect();
       const mboxes = await client.list();
-      return mboxes.map((m) => m.path);
+      // delimiter za tree prikaz (podfolderi) u config-u vidzeta
+      return mboxes.map((m) => ({ path: m.path, delimiter: m.delimiter ?? "/" }));
     } catch (err) {
       return reply.code(502).send({ error: `IMAP: ${(err as Error).message}` });
     } finally {
@@ -66,44 +68,52 @@ export function imapRoutes(app: FastifyInstance) {
     }
   });
 
-  // Lista poruka izabranog foldera, najnovije prvo.
-  app.get<{ Querystring: { folder?: string; limit?: string } }>(
+  // Lista poruka - jedan ili vise foldera (folders=a,b), najnovije prvo, spojeno.
+  app.get<{ Querystring: { folder?: string; folders?: string; limit?: string } }>(
     "/api/dashboard/imap/poruke",
     async (req, reply) => {
       if (!req.user) return reply.code(401).send({ error: "Niste prijavljeni" });
       const cfg = await korisnikovImap(req.user.id);
       if (!cfg?.host) return reply.code(400).send({ error: "IMAP nije podešen" });
 
-      const folder = req.query.folder || cfg.folder || "INBOX";
+      const lista = (req.query.folders || req.query.folder || cfg.folder || "INBOX")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
       const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
 
       const client = imapKlijent(cfg);
       try {
         await client.connect();
-        const lock = await client.getMailboxLock(folder);
-        try {
-          const total =
-            typeof client.mailbox === "object" ? client.mailbox.exists : 0;
-          if (total === 0) return [] as Poruka[];
-          const od = Math.max(1, total - limit + 1);
-          const poruke: Poruka[] = [];
-          for await (const m of client.fetch(`${od}:${total}`, {
-            uid: true,
-            envelope: true,
-            flags: true,
-          })) {
-            poruke.push({
-              uid: m.uid,
-              from: m.envelope?.from?.[0]?.address ?? "",
-              subject: m.envelope?.subject ?? "(bez naslova)",
-              date: m.envelope?.date?.toISOString() ?? "",
-              seen: m.flags?.has("\\Seen") ?? false,
-            });
+        const poruke: Poruka[] = [];
+        // jedna konekcija, redom zakljucava svaki folder (getMailboxLock je serijski)
+        for (const folder of lista) {
+          const lock = await client.getMailboxLock(folder);
+          try {
+            const total = typeof client.mailbox === "object" ? client.mailbox.exists : 0;
+            if (total === 0) continue;
+            const od = Math.max(1, total - limit + 1);
+            for await (const m of client.fetch(`${od}:${total}`, {
+              uid: true,
+              envelope: true,
+              flags: true,
+            })) {
+              poruke.push({
+                folder,
+                uid: m.uid,
+                from: m.envelope?.from?.[0]?.address ?? "",
+                subject: m.envelope?.subject ?? "(bez naslova)",
+                date: m.envelope?.date?.toISOString() ?? "",
+                seen: m.flags?.has("\\Seen") ?? false,
+              });
+            }
+          } finally {
+            lock.release();
           }
-          return poruke.reverse();
-        } finally {
-          lock.release();
         }
+        // spojeno iz svih foldera - najnovije prvo, pa odseci na limit
+        poruke.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+        return poruke.slice(0, limit);
       } catch (err) {
         return reply.code(502).send({ error: `IMAP: ${(err as Error).message}` });
       } finally {

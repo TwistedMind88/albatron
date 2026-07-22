@@ -84,9 +84,6 @@ if [ "$MODE" = "install" ]; then
     read -rp "UFW firewall je aktivan. Otvoriti port $APP_PORT? [D/n]: " ans
     [[ "${ans:-d}" =~ ^[DdYy]?$ ]] && UFW_OPEN="da"
   fi
-
-  read -rp "Podesiti dnevni backup baze i fajlova u /var/backups/albatron? [D/n]: " ans
-  BACKUP_CRON="ne"; [[ "${ans:-d}" =~ ^[DdYy]?$ ]] && BACKUP_CRON="da"
 fi
 
 # ---------- preduslovi ----------
@@ -97,6 +94,9 @@ need_pkg=""
 for p in git curl openssl ca-certificates; do
   command -v "$p" >/dev/null || need_pkg="$need_pkg $p"
 done
+# smbclient (SMB push) i mount.nfs (NFS) za mrezni backup
+command -v smbclient >/dev/null || need_pkg="$need_pkg smbclient"
+command -v mount.nfs >/dev/null || need_pkg="$need_pkg nfs-common"
 if [ -n "$need_pkg" ]; then
   info "instaliram:$need_pkg"
   # shellcheck disable=SC2086
@@ -290,27 +290,23 @@ if [ "$MODE" = "install" ] && [ "$UFW_OPEN" = "da" ]; then
   ufw allow "$APP_PORT/tcp"
 fi
 
-# ---------- backup cron ----------
-if [ "$MODE" = "install" ] && [ "$BACKUP_CRON" = "da" ]; then
-  info "podesavam dnevni backup u /var/backups/albatron"
-  cat > /etc/cron.daily/albatron-backup <<EOF
-#!/bin/bash
-set -e
-BACKUP_DIR=/var/backups/albatron
-mkdir -p "\$BACKUP_DIR"
-STAMP=\$(date +%Y%m%d)
-sudo -u postgres pg_dump "$DB_NAME" | gzip > "\$BACKUP_DIR/db-\$STAMP.sql.gz"
-tar -czf "\$BACKUP_DIR/storage-\$STAMP.tar.gz" -C "$INSTALL_DIR" storage
-find "\$BACKUP_DIR" -type f -mtime +14 -delete
+# ---------- backup cron (svaki pun sat) ----------
+# cron radi svaki sat; backup.sh cita konfiguraciju iz baze (Podesavanja > Rezervne
+# kopije): ukljuceno, zakazani sat, retencija, lokalni folder i opcioni SMB/NFS cilj.
+# stari cron.daily/albatron-backup (ako postoji od ranije verzije) se uklanja.
+rm -f /etc/cron.daily/albatron-backup
+info "podesavam rezervne kopije (svaki sat, podesava se u aplikaciji) (/etc/cron.d/albatron-backup)"
+cat > /etc/cron.d/albatron-backup <<EOF
+0 * * * * root INSTALL_DIR=$INSTALL_DIR /bin/bash $INSTALL_DIR/scripts/backup.sh
 EOF
-  chmod +x /etc/cron.daily/albatron-backup
-fi
+chmod 644 /etc/cron.d/albatron-backup
 
-# ---------- auto-update cron (03:00) ----------
-# skripta sama proverava flag auto_update u bazi (Podesavanja > Automatsko azuriranje)
-info "podesavam automatski update u 03:00 (/etc/cron.d/albatron-update)"
+# ---------- auto-update cron (svaki pun sat) ----------
+# cron radi svaki sat; update.sh cita flag auto_update i zakazani 'sat' iz baze
+# (Podesavanja > Automatsko azuriranje) pa preskace ako nije taj sat.
+info "podesavam automatski update (svaki sat, cas se bira u podesavanjima) (/etc/cron.d/albatron-update)"
 cat > /etc/cron.d/albatron-update <<EOF
-0 3 * * * root INSTALL_DIR=$INSTALL_DIR /bin/bash $INSTALL_DIR/scripts/update.sh
+0 * * * * root INSTALL_DIR=$INSTALL_DIR /bin/bash $INSTALL_DIR/scripts/update.sh
 EOF
 chmod 644 /etc/cron.d/albatron-update
 

@@ -26,14 +26,24 @@ echo "---- $(date '+%Y-%m-%d %H:%M:%S') albatron update ----"
 ENV_FILE="$INSTALL_DIR/.env"
 DB_URL="$(grep '^DATABASE_URL=' "$ENV_FILE" 2>/dev/null | cut -d= -f2- || true)"
 
-# flag iz baze: podrazumevano ukljuceno; neuspeo upit = nastavi (default ukljuceno)
+# flag i sat iz baze: podrazumevano ukljuceno u 3h; neuspeo upit = nastavi (default ukljuceno)
+# cron radi na svaki pun sat; ovde biramo da li je bas taj sat za update.
 if [ "${FORCE_RUN:-0}" != "1" ]; then
   FLAG="$(psql "$DB_URL" -tAc "SELECT COALESCE((value->>'ukljucen')::boolean, true) FROM app_settings WHERE key='auto_update'" 2>/dev/null || echo "greska")"
   if [ "$FLAG" = "f" ]; then
     echo "auto-update iskljucen u podesavanjima - preskacem"
     exit 0
   fi
-  [ "$FLAG" = "greska" ] && echo "UPOZORENJE: provera flaga nije uspela - nastavljam (podrazumevano ukljuceno)"
+  if [ "$FLAG" = "greska" ]; then
+    echo "UPOZORENJE: provera flaga nije uspela - nastavljam (podrazumevano ukljuceno)"
+  else
+    SAT="$(psql "$DB_URL" -tAc "SELECT COALESCE((value->>'sat')::int, 3) FROM app_settings WHERE key='auto_update'" 2>/dev/null || echo "3")"
+    # 10# tera decimalno tumacenje (npr. 08/09 nisu validan oktal)
+    if [ "$((10#$(date +%H)))" -ne "$((10#$SAT))" ]; then
+      echo "nije zakazani sat za update (zakazano: ${SAT}h) - preskacem"
+      exit 0
+    fi
+  fi
 fi
 
 # zastita od preklapanja sa rucnim update-om

@@ -15,6 +15,7 @@ import { Sabloni } from "./Sabloni";
 import { Moduli, SkladistaSekcija } from "./Moduli";
 import { UpitSablon } from "./UpitSablon";
 import { AutoUpdate } from "./AutoUpdate";
+import { Backup } from "./Backup";
 import { Uputstvo } from "./Uputstvo";
 
 // Layout podesavanja (brief 11): vertikalni meni pored glavnog sidebara,
@@ -35,6 +36,7 @@ const SECTIONS: { id: string; label: string; el: ComponentType; adminOnly?: bool
   { id: "korisnici", label: "Korisnici", el: KorisniciPage, adminOnly: true },
   { id: "upit-sablon", label: "Upit dobavljača", el: UpitSablon, adminOnly: true },
   { id: "auto-update", label: "Automatsko ažuriranje", el: AutoUpdate, adminOnly: true },
+  { id: "backup", label: "Rezervne kopije", el: Backup, adminOnly: true },
   { id: "uputstvo", label: "Uputstvo", el: Uputstvo },
 ];
 
