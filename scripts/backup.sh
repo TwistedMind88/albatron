@@ -23,14 +23,21 @@ DB_URL="$(grep '^DATABASE_URL=' "$ENV_FILE" 2>/dev/null | cut -d= -f2- || true)"
 STORAGE="$(grep '^FILE_STORAGE=' "$ENV_FILE" 2>/dev/null | cut -d= -f2- || true)"
 STORAGE="${STORAGE:-$INSTALL_DIR/storage}"
 
-# citanje konfiguracije iz baze (tab-razdvojeno); prazan rezultat = podrazumevano
-CFG="$(psql "$DB_URL" -tAF$'\t' -c \
+# citanje konfiguracije iz baze (tab-razdvojeno); prazan rezultat = podrazumevano.
+# razlikuj gresku upita (baza nedostupna) od praznog rezultata (nema reda):
+# fail-closed - ako baza ne odgovara, ne nagadjaj da je ukljuceno, prekini.
+if CFG="$(psql "$DB_URL" -tAF$'\t' -c \
   "SELECT COALESCE(value->>'ukljucen','true'), COALESCE(value->>'sat','3'), \
           COALESCE(value->>'cuvajDana','14'), COALESCE(value->>'lokalniDir','/var/backups/albatron'), \
           COALESCE(value#>>'{mreza,tip}',''), COALESCE(value#>>'{mreza,server}',''), \
           COALESCE(value#>>'{mreza,deo}',''), COALESCE(value#>>'{mreza,folder}',''), \
           COALESCE(value#>>'{mreza,korisnik}',''), COALESCE(value#>>'{mreza,lozinka}','') \
-   FROM app_settings WHERE key='backup'" 2>/dev/null || true)"
+   FROM app_settings WHERE key='backup'" 2>/dev/null)"; then
+  :
+else
+  echo "GRESKA: citanje konfiguracije iz baze nije uspelo - prekidam (fail-closed)"
+  exit 1
+fi
 
 if [ -n "$CFG" ]; then
   IFS=$'\t' read -r UKLJUCEN SAT CUVAJ LOKALNI M_TIP M_SERVER M_DEO M_FOLDER M_USER M_PASS <<<"$CFG"
@@ -102,6 +109,15 @@ push_nfs() {
   umount "$mnt"
   rmdir "$mnt"
 }
+
+# podfolder ulazi u putanju na mount-u; odbij '..' i cudne znakove (path traversal).
+# neispravan podfolder gasi samo mrezni upis - lokalna kopija ostaje.
+if [ -n "$M_TIP" ] && [ -n "$M_FOLDER" ]; then
+  if printf '%s' "$M_FOLDER" | grep -q '\.\.' || ! printf '%s' "$M_FOLDER" | grep -qE '^[A-Za-z0-9_./-]+$'; then
+    echo "GRESKA: podfolder '$M_FOLDER' nije dozvoljen (samo slova/cifre/_ - . / bez '..') - preskacem mrezni upis"
+    M_TIP=""
+  fi
+fi
 
 case "$M_TIP" in
   smb)
